@@ -45,6 +45,67 @@ function getEffectiveMouse(rawMouse) {
   return orthoSnap(anchor, rawMouse);
 }
 
+// Hit-test polygon vertices — returns { polygon, index, zoneIndex? } or null
+function hitTestVertex(screenX, screenY) {
+  const threshold = 10; // px
+  // Check land polygon vertices
+  for (let i = 0; i < state.landPolygon.length; i++) {
+    const s = metersToScreen(state.landPolygon[i].x, state.landPolygon[i].y);
+    if (Math.hypot(screenX - s.x, screenY - s.y) < threshold) {
+      return { polygon: 'land', index: i };
+    }
+  }
+  // Check exclusion zone vertices
+  for (let zi = 0; zi < state.exclusionZones.length; zi++) {
+    for (let i = 0; i < state.exclusionZones[zi].length; i++) {
+      const s = metersToScreen(state.exclusionZones[zi][i].x, state.exclusionZones[zi][i].y);
+      if (Math.hypot(screenX - s.x, screenY - s.y) < threshold) {
+        return { polygon: 'exclusion', zoneIndex: zi, index: i };
+      }
+    }
+  }
+  return null;
+}
+
+// Hit-test polygon edges — returns { polygon, zoneIndex?, insertAfter, point } or null
+function hitTestEdge(screenX, screenY) {
+  const threshold = 8; // px
+  function checkPoly(poly, polygonType, zoneIndex) {
+    if (poly.length < 2) return null;
+    let best = null;
+    let bestDist = threshold;
+    for (let i = 0; i < poly.length; i++) {
+      const j = (i + 1) % poly.length;
+      const a = metersToScreen(poly[i].x, poly[i].y);
+      const b = metersToScreen(poly[j].x, poly[j].y);
+      // Closest point on segment a-b to (screenX, screenY)
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy;
+      if (len2 === 0) continue;
+      let t = ((screenX - a.x) * dx + (screenY - a.y) * dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const cx = a.x + t * dx, cy = a.y + t * dy;
+      const dist = Math.hypot(screenX - cx, screenY - cy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        // Convert the closest screen point back to meters for the new vertex
+        const meters = screenToMeters(cx, cy);
+        best = { polygon: polygonType, zoneIndex, insertAfter: i, point: meters };
+      }
+    }
+    return best;
+  }
+  // Check land polygon
+  const landHit = checkPoly(state.landPolygon, 'land');
+  if (landHit) return landHit;
+  // Check exclusion zones
+  for (let zi = 0; zi < state.exclusionZones.length; zi++) {
+    const exHit = checkPoly(state.exclusionZones[zi], 'exclusion', zi);
+    if (exHit) return exHit;
+  }
+  return null;
+}
+
 export function initInputHandlers() {
   canvas.addEventListener('mousemove', onMouseMove);
   canvas.addEventListener('mousedown', onMouseDown);
@@ -64,6 +125,18 @@ function onMouseMove(e) {
 
   document.getElementById('mouse-pos').textContent = `${state.mouse.x.toFixed(1)}, ${state.mouse.y.toFixed(1)} m`;
 
+  // Vertex dragging (double-click initiated)
+  if (state.draggingVertex) {
+    const dv = state.draggingVertex;
+    if (dv.polygon === 'land') {
+      state.landPolygon[dv.index] = { x: state.mouse.x, y: state.mouse.y };
+    } else if (dv.polygon === 'exclusion') {
+      state.exclusionZones[dv.zoneIndex][dv.index] = { x: state.mouse.x, y: state.mouse.y };
+    }
+    draw();
+    return;
+  }
+
   // Entity dragging — pointer tool
   const sel = getSelected();
   if (sel && sel.dragging) {
@@ -76,7 +149,8 @@ function onMouseMove(e) {
   // Hover cursor feedback — show 'move' when over a selectable entity in pointer mode
   if (state.mode === 'idle' && !state.isPanning) {
     const hover = hitTestAll(state.mouse.x, state.mouse.y, getParams());
-    canvas.style.cursor = hover ? 'move' : 'default';
+    const vertexHover = hitTestVertex(sx, sy);
+    canvas.style.cursor = (hover || vertexHover !== null) ? 'move' : 'default';
   }
 
   // When map is active, skip canvas pan (locked = frozen view, unlocked = Leaflet handles it)
@@ -100,8 +174,13 @@ function onMouseDown(e) {
     return;
   }
 
-  // Pointer tool — entity hit-test and drag start
+  // Pointer tool — entity hit-test and drag start (skip if clicking on a polygon vertex)
   if (e.button === 0 && state.mode === 'idle') {
+    const rect2 = canvas.getBoundingClientRect();
+    const sx2 = e.clientX - rect2.left;
+    const sy2 = e.clientY - rect2.top;
+    if (hitTestVertex(sx2, sy2)) return; // vertex takes priority — let dblclick handle it
+
     const params = getParams();
     const hit = hitTestAll(state.mouse.x, state.mouse.y, params);
     if (hit) {
@@ -137,6 +216,21 @@ function onMouseDown(e) {
 }
 
 function onMouseUp() {
+  // Vertex drag end
+  if (state.draggingVertex) {
+    state.draggingVertex = null;
+    canvas.style.cursor = 'default';
+    // Update land area display
+    if (state.landPolygon.length >= 3) {
+      const area = polygonArea(state.landPolygon);
+      document.getElementById('land-area').textContent = `${area.toFixed(0)} m²`;
+    }
+    // Re-optimize if needed
+    if (state.optimizationResult) optimize();
+    draw();
+    return;
+  }
+
   // Entity drag end
   const sel = getSelected();
   if (sel && sel.dragging) {
@@ -157,6 +251,21 @@ function onMouseUp() {
 
 function onDoubleClick(e) {
   e.preventDefault();
+
+  // In pointer mode, double-click on a vertex to start dragging it
+  if (state.mode === 'idle') {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const hit = hitTestVertex(sx, sy);
+    if (hit) {
+      state.draggingVertex = hit;
+      canvas.style.cursor = 'move';
+      draw();
+      return;
+    }
+  }
+
   // Remove the two extra points added by the two mousedown events that precede dblclick
   if (state.currentPolygon.length >= 2) {
     state.currentPolygon.pop();
@@ -169,6 +278,50 @@ function onDoubleClick(e) {
 
 function onContextMenu(e) {
   e.preventDefault();
+
+  // In pointer mode: right-click vertex to delete, right-click edge to add node
+  if (state.mode === 'idle') {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+
+    // Check vertex first — delete it
+    const vertexHit = hitTestVertex(sx, sy);
+    if (vertexHit) {
+      if (vertexHit.polygon === 'land') {
+        if (state.landPolygon.length > 3) {
+          state.landPolygon.splice(vertexHit.index, 1);
+          const area = polygonArea(state.landPolygon);
+          document.getElementById('land-area').textContent = `${area.toFixed(0)} m²`;
+          if (state.optimizationResult) optimize();
+        }
+      } else if (vertexHit.polygon === 'exclusion') {
+        const zone = state.exclusionZones[vertexHit.zoneIndex];
+        if (zone.length > 3) {
+          zone.splice(vertexHit.index, 1);
+        }
+      }
+      draw();
+      return;
+    }
+
+    // Check edge — insert new node
+    const edgeHit = hitTestEdge(sx, sy);
+    if (edgeHit) {
+      if (edgeHit.polygon === 'land') {
+        state.landPolygon.splice(edgeHit.insertAfter + 1, 0, edgeHit.point);
+        const area = polygonArea(state.landPolygon);
+        document.getElementById('land-area').textContent = `${area.toFixed(0)} m²`;
+        if (state.optimizationResult) optimize();
+      } else if (edgeHit.polygon === 'exclusion') {
+        state.exclusionZones[edgeHit.zoneIndex].splice(edgeHit.insertAfter + 1, 0, edgeHit.point);
+      }
+      draw();
+      return;
+    }
+  }
+
+  // During drawing: undo last node
   if (state.currentPolygon.length > 0) {
     state.currentPolygon.pop();
     draw();

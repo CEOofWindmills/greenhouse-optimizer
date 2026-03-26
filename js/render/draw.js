@@ -27,8 +27,10 @@ export function draw() {
   }
 
   // Exclusion zones
-  for (const zone of state.exclusionZones) {
+  for (let zi = 0; zi < state.exclusionZones.length; zi++) {
+    const zone = state.exclusionZones[zi];
     drawPolygon(zone, 'rgba(243, 156, 18, 0.2)', 'rgba(243, 156, 18, 0.8)', true);
+    drawVertices(zone, 'rgba(243, 156, 18, 0.9)', '#fff', 'exclusion', zi);
   }
 
   // Land polygon
@@ -60,7 +62,7 @@ export function draw() {
     drawOptimizationResult(state.optimizationResult, params);
   }
 
-  drawVertices(state.landPolygon, '#e94560', '#fff');
+  drawVertices(state.landPolygon, '#e94560', '#fff', 'land');
   drawInProgressVertices();
 }
 
@@ -81,13 +83,24 @@ function drawPolygon(poly, fill, stroke, closed) {
   ctx.stroke();
 }
 
-function drawVertices(poly, fillColor, labelColor) {
+function drawVertices(poly, fillColor, labelColor, polygonType, zoneIndex) {
+  const dv = state.draggingVertex;
   for (let idx = 0; idx < poly.length; idx++) {
     const p = poly[idx];
     const s = metersToScreen(p.x, p.y);
+    const isDragging = dv && dv.polygon === polygonType && dv.index === idx
+      && (polygonType !== 'exclusion' || dv.zoneIndex === zoneIndex);
+    // Highlight ring for dragged vertex
+    if (isDragging) {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 14, 0, Math.PI * 2);
+      ctx.strokeStyle = '#0f9b8e';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
     ctx.beginPath();
-    ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
-    ctx.fillStyle = fillColor;
+    ctx.arc(s.x, s.y, isDragging ? 8 : 6, 0, Math.PI * 2);
+    ctx.fillStyle = isDragging ? '#0f9b8e' : fillColor;
     ctx.fill();
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
@@ -95,7 +108,7 @@ function drawVertices(poly, fillColor, labelColor) {
     ctx.fillStyle = labelColor;
     ctx.font = '10px Segoe UI';
     ctx.textAlign = 'center';
-    ctx.fillText(idx + 1, s.x, s.y - 10);
+    ctx.fillText(idx + 1, s.x, s.y - (isDragging ? 12 : 10));
   }
 }
 

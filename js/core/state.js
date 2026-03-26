@@ -21,6 +21,9 @@ export const state = {
   mapLocked: false, // When true, map is frozen and canvas gets pointer events
   refLatLng: null, // { lat, lng } — anchor point where lat/lng = meters (0,0)
 
+  // Vertex dragging (double-click to drag land/exclusion nodes)
+  draggingVertex: null, // { polygon: 'land' | 'exclusion', zoneIndex?: number, index: number }
+
   // Tree grid offset in rotated UV space (draggable)
   treeGridOffset: { u: 0, v: 0 },
 };
