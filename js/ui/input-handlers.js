@@ -2,6 +2,7 @@ import { state, canvas } from '../core/state.js';
 import { getScale, getParams, screenToMeters, metersToScreen } from '../core/transforms.js';
 import { polygonArea } from '../core/geometry.js';
 import { draw } from '../render/draw.js';
+import { updateCanvasPointerEvents } from '../map/leaflet-map.js';
 
 // Snap a point to the nearest ortho direction (along or perpendicular to tree rows)
 // relative to an anchor point
@@ -60,7 +61,8 @@ function onMouseMove(e) {
 
   document.getElementById('mouse-pos').textContent = `${state.mouse.x.toFixed(1)}, ${state.mouse.y.toFixed(1)} m`;
 
-  if (state.isPanning) {
+  // When map is active, Leaflet handles panning — skip canvas pan
+  if (state.isPanning && !state.mapActive) {
     state.panX += e.clientX - state.lastMouse.x;
     state.panY += e.clientY - state.lastMouse.y;
     state.lastMouse = { x: e.clientX, y: e.clientY };
@@ -70,7 +72,8 @@ function onMouseMove(e) {
 }
 
 function onMouseDown(e) {
-  if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+  // When map is active, Leaflet handles panning — skip canvas pan initiation
+  if ((e.button === 1 || (e.button === 0 && e.ctrlKey)) && !state.mapActive) {
     state.isPanning = true;
     state.lastMouse = { x: e.clientX, y: e.clientY };
     canvas.style.cursor = 'grabbing';
@@ -124,6 +127,9 @@ function onContextMenu(e) {
 }
 
 function onWheel(e) {
+  // When map is active, let Leaflet handle zoom — it syncs canvas via move event
+  if (state.mapActive) return;
+
   e.preventDefault();
   const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
   const rect = canvas.getBoundingClientRect();
@@ -145,6 +151,7 @@ function onKeyDown(e) {
     state.currentPolygon = [];
     document.getElementById('mode-indicator').style.display = 'none';
     canvas.style.cursor = 'default';
+    updateCanvasPointerEvents();
     draw();
   }
   // F8 toggles ortho mode (like AutoCAD)
@@ -168,6 +175,7 @@ export function finishPolygon() {
     state.mode = 'idle';
     document.getElementById('mode-indicator').style.display = 'none';
     canvas.style.cursor = 'default';
+    updateCanvasPointerEvents();
 
     const area = polygonArea(state.landPolygon);
     document.getElementById('land-area').textContent = `${area.toFixed(0)} m²`;
@@ -179,6 +187,7 @@ export function finishPolygon() {
     state.mode = 'idle';
     document.getElementById('mode-indicator').style.display = 'none';
     canvas.style.cursor = 'default';
+    updateCanvasPointerEvents();
     draw();
   }
 }

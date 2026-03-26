@@ -9,11 +9,12 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
   let totalArea = 0;
   let jogCount = 0;
 
-  // Build grid
+  // Build grid — bounded by adjusted bounds (inset for structural margins)
+  // A cell at u spans [u, u+uSpacing], so its right edge must fit within adjusted bounds
   const gridU = [];
   const gridV = [];
-  for (let u = startU; u < rBounds.maxX + uSpacing; u += uSpacing) gridU.push(u);
-  for (let v = startV; v < rBounds.maxY + vSpacing; v += vSpacing) gridV.push(v);
+  for (let u = startU; u + uSpacing <= rBounds.maxX + 0.001; u += uSpacing) gridU.push(u);
+  for (let v = startV; v + vSpacing <= rBounds.maxY + 0.001; v += vSpacing) gridV.push(v);
 
   // Coverage grid: 1 = inside land, 0 = outside
   const grid = [];
@@ -34,15 +35,19 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
   // Find the tallest contiguous house run for each starting j
   while (true) {
     // Find the largest contiguous block (houses × total bays)
-    const block = findLargestBlock(grid, used, gridU, gridV, maxVCount);
+    const block = findLargestBlock(grid, used, gridU, gridV);
     if (!block) break;
 
     // block = { i, j, spanBays, numHouses } — full horizontal span, not yet split
 
-    // Distribute spanBays evenly into sections respecting maxUCount and minBaysSplit
-    const distribution = distributeBays(block.spanBays, maxUCount, params.minBaysSplit);
+    // Distribute spanBays evenly along U (parallel splits)
+    const bayDist = distributeBays(block.spanBays, maxUCount, params.minBaysSplit);
 
-    if (distribution.length === 0) {
+    // Distribute numHouses evenly along V (perpendicular splits)
+    // minHousesSplit = 1 (any single house is valid as a section)
+    const houseDist = distributeBays(block.numHouses, maxVCount, 1);
+
+    if (bayDist.length === 0 || houseDist.length === 0) {
       // Can't distribute — mark as used and skip
       for (let ii = block.i; ii < block.i + block.spanBays; ii++) {
         for (let jj = block.j; jj < block.j + block.numHouses; jj++) {
@@ -52,52 +57,64 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
       continue;
     }
 
-    // Place each section from the distribution
-    let currentI = block.i;
-    for (const numBays of distribution) {
-      const sectionWidth = numBays * uSpacing;
-      const sectionHeight = block.numHouses * vSpacing;
+    // Place sections for each (bayGroup, houseGroup) combination
+    let currentJ = block.j;
+    for (const numHouses of houseDist) {
+      let currentI = block.i;
+      for (const numBays of bayDist) {
+        const sectionWidth = numBays * uSpacing;
+        const sectionHeight = numHouses * vSpacing;
 
-      // Mark cells as used
-      for (let ii = currentI; ii < currentI + numBays; ii++) {
-        for (let jj = block.j; jj < block.j + block.numHouses; jj++) {
-          used[ii][jj] = true;
+        // Mark cells as used
+        for (let ii = currentI; ii < currentI + numBays; ii++) {
+          for (let jj = currentJ; jj < currentJ + numHouses; jj++) {
+            used[ii][jj] = true;
+          }
         }
+
+        const isJog = false; // jogs determined after all sections placed
+
+        const footprintWidth = sectionWidth + 2 * params.gableBracingDist;
+        const footprintHeight = sectionHeight + 2 * params.sidewallBracingDist;
+
+        sections.push({
+          u: gridU[currentI],
+          v: gridV[currentJ],
+          width: sectionWidth,
+          height: sectionHeight,
+          footprintWidth,
+          footprintHeight,
+          houses: numHouses,
+          bays: numBays,
+          baySize: uSpacing,
+          houseWidth: vSpacing,
+          isJog,
+          effectiveArea: sectionWidth * sectionHeight,
+          footprintArea: footprintWidth * footprintHeight,
+        });
+
+        totalArea += sectionWidth * sectionHeight;
+        currentI += numBays;
       }
-
-      const isJog = false; // jogs determined after all sections placed
-
-      const footprintWidth = sectionWidth + 2 * params.gableBracingDist;
-      const footprintHeight = sectionHeight + 2 * params.sidewallBracingDist;
-
-      sections.push({
-        u: gridU[currentI],
-        v: gridV[block.j],
-        width: sectionWidth,
-        height: sectionHeight,
-        footprintWidth,
-        footprintHeight,
-        houses: block.numHouses,
-        bays: numBays,
-        baySize: uSpacing,
-        houseWidth: vSpacing,
-        isJog,
-        effectiveArea: sectionWidth * sectionHeight,
-        footprintArea: footprintWidth * footprintHeight,
-      });
-
-      totalArea += sectionWidth * sectionHeight;
-      currentI += numBays;
+      currentJ += numHouses;
     }
   }
+
+  // Filter out tiny residual sections (e.g. fragments at edges of angled grids)
+  // Keep only sections with at least 2 bays AND at least 2 houses
+  const filteredSections = sections.filter(s => s.bays >= 2 && s.houses >= 2);
+
+  // Recalculate totalArea from filtered sections
+  totalArea = 0;
+  for (const s of filteredSections) totalArea += s.effectiveArea;
 
   // Detect splits and jogs between section pairs
   const parallelSplits = [];   // runs along V (parallel to gables) — sections adjacent along U
   const perpSplits = [];       // runs along U (parallel to sidewalls) — sections adjacent along V
 
-  for (let a = 0; a < sections.length; a++) {
-    for (let b = a + 1; b < sections.length; b++) {
-      const sa = sections[a], sb = sections[b];
+  for (let a = 0; a < filteredSections.length; a++) {
+    for (let b = a + 1; b < filteredSections.length; b++) {
+      const sa = filteredSections[a], sb = filteredSections[b];
 
       // Parallel split: sections share a U edge (one ends where the other starts along U)
       // and overlap in V (same sidewall range)
@@ -139,9 +156,9 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
   // Jog detection: a jog occurs when adjacent sections are offset
   // (not fully aligned along their shared edge)
   jogCount = 0;
-  for (let a = 0; a < sections.length; a++) {
-    for (let b = a + 1; b < sections.length; b++) {
-      const sa = sections[a], sb = sections[b];
+  for (let a = 0; a < filteredSections.length; a++) {
+    for (let b = a + 1; b < filteredSections.length; b++) {
+      const sa = filteredSections[a], sb = filteredSections[b];
       const uAdj = Math.abs((sa.u + sa.width) - sb.u) < 0.01 ||
                     Math.abs((sb.u + sb.width) - sa.u) < 0.01;
       const vAdj = Math.abs((sa.v + sa.height) - sb.v) < 0.01 ||
@@ -151,16 +168,16 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
         // Adjacent along U — jog if V extents don't match
         if (Math.abs(sa.v - sb.v) > 0.01 || Math.abs(sa.height - sb.height) > 0.01) {
           jogCount++;
-          sections[a].isJog = true;
-          sections[b].isJog = true;
+          filteredSections[a].isJog = true;
+          filteredSections[b].isJog = true;
         }
       }
       if (vAdj) {
         // Adjacent along V — jog if U extents don't match
         if (Math.abs(sa.u - sb.u) > 0.01 || Math.abs(sa.width - sb.width) > 0.01) {
           jogCount++;
-          sections[a].isJog = true;
-          sections[b].isJog = true;
+          filteredSections[a].isJog = true;
+          filteredSections[b].isJog = true;
         }
       }
     }
@@ -171,7 +188,7 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
   const score = totalArea - jogCount * params.jogPenalty;
 
   return {
-    sections,
+    sections: filteredSections,
     parallelSplits,
     perpSplits,
     splits: parallelSplits, // backward compat
@@ -186,7 +203,8 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
 
 // Find the largest contiguous block in the grid
 // Returns { i, j, spanBays, numHouses } — the full horizontal span of available bays
-function findLargestBlock(grid, used, gridU, gridV, maxVCount) {
+// No max cap here — distribution handles splitting into valid sizes
+function findLargestBlock(grid, used, gridU, gridV) {
   let bestBlock = null;
   let bestArea = 0;
 
@@ -204,7 +222,7 @@ function findLargestBlock(grid, used, gridU, gridV, maxVCount) {
 
       // Find max houses downward from j, keeping the full span valid
       let numHouses = 0;
-      for (let jj = j; jj < gridV.length && numHouses < maxVCount; jj++) {
+      for (let jj = j; jj < gridV.length; jj++) {
         let rowOk = true;
         for (let ii = i; ii < i + spanBays; ii++) {
           if (!grid[ii][jj] || used[ii][jj]) { rowOk = false; break; }

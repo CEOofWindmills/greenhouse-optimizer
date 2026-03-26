@@ -2,6 +2,7 @@ import { state, initCanvas, canvas } from './core/state.js';
 import { draw } from './render/draw.js';
 import { initInputHandlers } from './ui/input-handlers.js';
 import { initButtons } from './ui/buttons.js';
+import { initMap, syncCanvasToMap } from './map/leaflet-map.js';
 
 // Initialize canvas
 const container = document.getElementById('canvas-container');
@@ -11,7 +12,11 @@ initCanvas(canvasEl);
 function resizeCanvas() {
   canvasEl.width = container.clientWidth;
   canvasEl.height = container.clientHeight;
-  draw();
+  if (state.mapActive) {
+    syncCanvasToMap();
+  } else {
+    draw();
+  }
 }
 
 window.addEventListener('resize', resizeCanvas);
@@ -19,6 +24,9 @@ window.addEventListener('resize', resizeCanvas);
 // Wire up UI
 initInputHandlers();
 initButtons();
+
+// Initialize Leaflet map (starts hidden)
+initMap();
 
 // Initial render
 resizeCanvas();

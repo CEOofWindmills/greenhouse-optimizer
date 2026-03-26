@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Greenhouse Coverage Optimizer</title>
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -76,16 +78,26 @@
       <span class="unit">m</span>
     </div>
     <div class="param-row">
+      <label>No Parallel Splits</label>
+      <input type="checkbox" id="no-parallel-splits" checked style="width:auto">
+      <span class="unit"></span>
+    </div>
+    <div class="param-row" id="row-max-bays" style="display:none">
       <label>Max Bays per Section</label>
       <input type="number" id="max-bays" value="10" min="4" max="20" step="1">
       <span class="unit"></span>
     </div>
-    <div class="param-row">
+    <div class="param-row" id="row-min-bays-split" style="display:none">
       <label>Min Bays (parallel split)</label>
       <input type="number" id="min-bays-split" value="4" min="1" max="10" step="1">
       <span class="unit"></span>
     </div>
     <div class="param-row">
+      <label>No Perp Splits</label>
+      <input type="checkbox" id="no-perp-splits" checked style="width:auto">
+      <span class="unit"></span>
+    </div>
+    <div class="param-row" id="row-max-drive-shaft" style="display:none">
       <label>Max Drive Shaft</label>
       <input type="number" id="max-drive-shaft" value="108" min="50" max="200" step="1">
       <span class="unit">m</span>
@@ -166,9 +178,15 @@
 </div>
 
 <div id="canvas-container">
-  <canvas id="canvas"></canvas>
+  <div id="map-container" style="position:absolute; inset:0; z-index:0; display:none;"></div>
+  <canvas id="canvas" style="position:relative; z-index:1;"></canvas>
   <div id="mode-indicator" class="mode-indicator" style="display:none"></div>
   <div class="toolbar">
+    <div id="search-bar" style="display:none; margin-bottom:4px;">
+      <input type="text" id="address-input" placeholder="Search address..." style="width:200px;padding:4px 8px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;border-radius:4px;font-size:12px">
+      <button class="btn-secondary" id="btn-search" style="padding:4px 8px">Go</button>
+    </div>
+    <button class="btn-secondary" id="btn-map">Map: Off</button>
     <button class="btn-secondary" id="btn-zoom-in">Zoom +</button>
     <button class="btn-secondary" id="btn-zoom-out">Zoom -</button>
     <button class="btn-secondary" id="btn-fit">Fit</button>

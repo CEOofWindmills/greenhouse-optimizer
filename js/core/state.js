@@ -15,6 +15,10 @@ export const state = {
   lastMouse: { x: 0, y: 0 },
   mouse: { x: 0, y: 0 }, // in meters
   orthoMode: false,
+
+  // Map
+  mapActive: false,
+  refLatLng: null, // { lat, lng } — anchor point where lat/lng = meters (0,0)
 };
 
 // Canvas references — set once in main.js

@@ -7,7 +7,10 @@ import { drawOptimizationResult } from './sections.js';
 export function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  drawGrid();
+  // Skip grid when map is active — satellite imagery provides context
+  if (!state.mapActive) {
+    drawGrid();
+  }
 
   const params = getParams();
   if (params.showTrees && state.landPolygon.length > 2) {

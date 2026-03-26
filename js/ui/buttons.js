@@ -4,12 +4,14 @@ import { polygonBounds } from '../core/geometry.js';
 import { optimize } from '../engine/optimizer.js';
 import { draw } from '../render/draw.js';
 import { toggleOrtho } from './input-handlers.js';
+import { setMapVisible, searchAddress, syncCanvasToMap, updateCanvasPointerEvents } from '../map/leaflet-map.js';
 
 export function initButtons() {
   document.getElementById('btn-draw-land').addEventListener('click', () => {
     state.mode = 'draw-land';
     state.currentPolygon = [];
     canvas.style.cursor = 'crosshair';
+    updateCanvasPointerEvents();
     const mi = document.getElementById('mode-indicator');
     mi.textContent = 'Drawing Land Boundary — click to place nodes, click the green first node (or double-click) to close, right-click to undo';
     mi.style.display = 'block';
@@ -19,6 +21,7 @@ export function initButtons() {
     state.mode = 'draw-exclusion';
     state.currentPolygon = [];
     canvas.style.cursor = 'crosshair';
+    updateCanvasPointerEvents();
     const mi = document.getElementById('mode-indicator');
     mi.textContent = 'Drawing Exclusion Zone — click to add points, double-click to finish';
     mi.style.display = 'block';
@@ -43,7 +46,7 @@ export function initButtons() {
 
   document.getElementById('btn-demo').addEventListener('click', () => {
     state.landPolygon = [
-      {x: 0, y: 0}, {x: 100, y: 0}, {x: 100, y: 80}, {x: 0, y: 80}
+      {x: 0, y: 0}, {x: 200, y: 0}, {x: 200, y: 160}, {x: 0, y: 160}
     ];
     state.exclusionZones = [];
     state.currentPolygon = [];
@@ -51,7 +54,7 @@ export function initButtons() {
     state.mode = 'idle';
     document.getElementById('mode-indicator').style.display = 'none';
     canvas.style.cursor = 'default';
-    document.getElementById('land-area').textContent = '8000 m²';
+    document.getElementById('land-area').textContent = '32000 m²';
     optimize();
     // Fit to view
     document.getElementById('btn-fit').click();
@@ -86,6 +89,37 @@ export function initButtons() {
     state.panY = -(centerY * ppm * state.zoom);
     document.getElementById('scale-display').textContent = `${(ppm * state.zoom).toFixed(1)} px/m`;
     draw();
+  });
+
+  // Map toggle
+  document.getElementById('btn-map').addEventListener('click', () => {
+    setMapVisible(!state.mapActive);
+    document.getElementById('search-bar').style.display = state.mapActive ? 'flex' : 'none';
+  });
+
+  // Address search
+  document.getElementById('btn-search').addEventListener('click', async () => {
+    const input = document.getElementById('address-input');
+    const result = await searchAddress(input.value);
+    if (!result) {
+      input.style.borderColor = '#e74c3c';
+      setTimeout(() => input.style.borderColor = '#0f3460', 1500);
+    }
+  });
+
+  document.getElementById('address-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      document.getElementById('btn-search').click();
+    }
+  });
+
+  // Split toggle — show/hide detail inputs
+  document.getElementById('no-parallel-splits').addEventListener('change', (e) => {
+    document.getElementById('row-max-bays').style.display = e.target.checked ? 'none' : 'flex';
+    document.getElementById('row-min-bays-split').style.display = e.target.checked ? 'none' : 'flex';
+  });
+  document.getElementById('no-perp-splits').addEventListener('change', (e) => {
+    document.getElementById('row-max-drive-shaft').style.display = e.target.checked ? 'none' : 'flex';
   });
 
   // Redraw on param changes

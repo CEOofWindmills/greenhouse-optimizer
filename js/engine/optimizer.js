@@ -10,6 +10,25 @@ const DEFAULT_AREA_WEIGHT = 1.0;      // weight for coverage area
 const DEFAULT_POST_PENALTY = 5.0;     // penalty per post (m² equivalent) — very aggressive
 const DEFAULT_JOG_PENALTY = 50;       // penalty per jog (m² equivalent)
 
+// Compute asymmetric margins: how far the physical footprint extends beyond grid cells on each side
+// Returns { minU, maxU, minV, maxV } in meters
+function computeMargins(params, houseWidth) {
+  const bayOffset = params.bayPostOffset != null ? params.bayPostOffset : params.treeSpacing / 2;
+  const houseOffset = params.housePostOffset != null ? params.housePostOffset : 0;
+
+  let sidewallOffset;
+  if (params.sidewallRule === 'normal') sidewallOffset = houseWidth / 2;
+  else if (params.sidewallRule === 'adjusted') sidewallOffset = houseWidth / 2 + 0.3048;
+  else sidewallOffset = houseWidth; // flat
+
+  return {
+    minU: Math.max(0, params.gableBracingDist - bayOffset),
+    maxU: bayOffset + params.gableBracingDist,
+    minV: Math.max(0, sidewallOffset + params.sidewallBracingDist - houseOffset),
+    maxV: Math.max(0, houseOffset + sidewallOffset + params.sidewallBracingDist - houseWidth),
+  };
+}
+
 export function optimize() {
   if (state.landPolygon.length < 3) {
     alert('Draw a land boundary first (at least 3 points).');
@@ -70,16 +89,29 @@ export function optimize() {
   for (const baySize of validBaySizes) {
     for (const houseWidth of validHouseWidths) {
       const maxHousesByShaft = Math.floor(params.maxDriveShaft / houseWidth);
-      const maxBaysByCable = Math.floor(params.maxDriveCable / baySize);
+      const maxBaysByCable = params.noParallelSplits ? 9999 : Math.floor(params.maxDriveCable / baySize);
       const effectiveMaxBays = Math.min(params.maxBays, maxBaysByCable);
 
       if (effectiveMaxBays < params.minBaysSplit) continue;
 
-      const startU = Math.floor(rBounds.minX / baySize) * baySize;
-      const startV = Math.floor(rBounds.minY / houseWidth) * houseWidth;
+      // Inset bounds by asymmetric margins so physical footprint stays inside land
+      const margins = computeMargins(params, houseWidth);
+      const adjustedBounds = {
+        minX: rBounds.minX + margins.minU,
+        maxX: rBounds.maxX - margins.maxU,
+        minY: rBounds.minY + margins.minV,
+        maxY: rBounds.maxY - margins.maxV,
+      };
+
+      // Skip if margins consume the entire parcel
+      if (adjustedBounds.minX >= adjustedBounds.maxX || adjustedBounds.minY >= adjustedBounds.maxY) continue;
+
+      // Snap grid start to first cell inside adjusted bounds
+      const startU = Math.ceil(adjustedBounds.minX / baySize) * baySize;
+      const startV = Math.ceil(adjustedBounds.minY / houseWidth) * houseWidth;
 
       const result = greedyPlace(
-        rotatedPoly, startU, startV, rBounds,
+        rotatedPoly, startU, startV, adjustedBounds,
         baySize, houseWidth, effectiveMaxBays, maxHousesByShaft,
         params, cosA, sinA
       );
