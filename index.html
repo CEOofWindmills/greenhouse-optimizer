@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Greenhouse Coverage Optimizer</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>Greenhouse Optimizer</h2>
+
+  <h3>Drawing Tools</h3>
+  <div class="btn-row">
+    <button class="btn-primary" id="btn-draw-land" title="Click points to define land boundary">Draw Land</button>
+    <button class="btn-secondary" id="btn-draw-exclusion" title="Draw exclusion zones (buildings, ponds, etc)">Exclusion Zone</button>
+    <button class="btn-danger" id="btn-clear">Clear All</button>
+  </div>
+
+  <h3>Tree Rows</h3>
+  <div class="param-group">
+    <div class="param-row">
+      <label>Row Spacing</label>
+      <input type="number" id="tree-row-spacing" value="5" min="1" max="20" step="0.5">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Tree Spacing (in-row)</label>
+      <input type="number" id="tree-spacing" value="3" min="1" max="10" step="0.5">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Row Direction</label>
+      <input type="number" id="tree-direction" value="0" min="0" max="360" step="1">
+      <span class="unit">deg</span>
+    </div>
+    <div class="param-row">
+      <label>Show Trees</label>
+      <input type="checkbox" id="show-trees" checked style="width:auto">
+      <span class="unit"></span>
+    </div>
+  </div>
+
+  <h3>Greenhouse Constraints</h3>
+  <div class="param-group">
+    <div class="param-row">
+      <label>Min House Width</label>
+      <input type="number" id="min-house" value="3.5" min="2" max="6" step="0.1">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Max House Width</label>
+      <input type="number" id="max-house" value="5.2" min="3" max="8" step="0.1">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Min Bay Size</label>
+      <input type="number" id="min-bay" value="6" min="4" max="12" step="0.5">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Max Bay Size</label>
+      <input type="number" id="max-bay" value="10" min="6" max="14" step="0.5">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Max Bays per Section</label>
+      <input type="number" id="max-bays" value="10" min="4" max="20" step="1">
+      <span class="unit"></span>
+    </div>
+    <div class="param-row">
+      <label>Min Bays (parallel split)</label>
+      <input type="number" id="min-bays-split" value="4" min="1" max="10" step="1">
+      <span class="unit"></span>
+    </div>
+    <div class="param-row">
+      <label>Max Drive Shaft</label>
+      <input type="number" id="max-drive-shaft" value="108" min="50" max="200" step="1">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Max Drive Cable</label>
+      <input type="number" id="max-drive-cable" value="76" min="30" max="120" step="1">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Bracing Distance</label>
+      <input type="number" id="bracing-dist" value="1.5" min="0" max="5" step="0.1">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Bay Post Offset</label>
+      <input type="number" id="bay-post-offset" value="" min="0" max="10" step="0.1" placeholder="auto">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>House Post Offset</label>
+      <input type="number" id="house-post-offset" value="" min="0" max="10" step="0.1" placeholder="auto">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Post Cost Penalty</label>
+      <input type="number" id="post-penalty" value="" min="0" max="50" step="0.5" placeholder="5.0">
+      <span class="unit">m²/post</span>
+    </div>
+    <div class="param-row">
+      <label>Jog Penalty Weight</label>
+      <input type="number" id="jog-penalty" value="50" min="0" max="500" step="10">
+      <span class="unit">m²</span>
+    </div>
+  </div>
+
+  <h3>Scale</h3>
+  <div class="param-group">
+    <div class="param-row">
+      <label>Pixels per Meter</label>
+      <input type="number" id="scale" value="5" min="1" max="50" step="0.5">
+      <span class="unit">px</span>
+    </div>
+  </div>
+
+  <div class="btn-row" style="margin-top: 8px;">
+    <button class="btn-success" id="btn-optimize" style="flex:1">Optimize Coverage</button>
+  </div>
+
+  <h3>Results</h3>
+  <div id="results">
+    <div style="color:#666; text-align:center; padding: 20px 0;">Draw land boundary to begin</div>
+  </div>
+
+  <h3>Greenhouse Calcs</h3>
+  <div id="greenhouse-calcs">
+    <div style="color:#666; text-align:center; padding: 10px 0;">Run optimization to see calcs</div>
+  </div>
+
+  <h3>Legend</h3>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:#e94560"></div>Land Boundary</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#f39c12"></div>Exclusion Zone</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:rgba(15,155,142,0.3);border:1px solid #0f9b8e"></div>Greenhouse</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#3498db"></div>Drive Gable</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#9b59b6"></div>Pulley Gable</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#fff;border-radius:50%"></div>Post</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#2ecc71;border-radius:50%"></div>Tree</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#e74c3c; opacity:0.5"></div>Jog</div>
+  </div>
+</div>
+
+<div id="canvas-container">
+  <canvas id="canvas"></canvas>
+  <div id="mode-indicator" class="mode-indicator" style="display:none"></div>
+  <div class="toolbar">
+    <button class="btn-secondary" id="btn-zoom-in">Zoom +</button>
+    <button class="btn-secondary" id="btn-zoom-out">Zoom -</button>
+    <button class="btn-secondary" id="btn-fit">Fit</button>
+  </div>
+  <div id="status-bar">
+    <div>Mouse: <span id="mouse-pos">0, 0</span></div>
+    <div>Scale: <span id="scale-display">5 px/m</span></div>
+    <div>Land Area: <span id="land-area">0 m²</span></div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
