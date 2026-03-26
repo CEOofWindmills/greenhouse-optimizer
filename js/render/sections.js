@@ -5,18 +5,28 @@ export function drawOptimizationResult(result, params) {
   const cosA = Math.cos(params.treeDirection);
   const sinA = Math.sin(params.treeDirection);
 
-  // Build set of U positions that are parallel splits
+  // Build set of U positions that are parallel splits (gable-like)
   const splitUPositions = new Set();
   for (const split of result.parallelSplits || []) {
     splitUPositions.add(Math.round(split.u * 1000) / 1000);
   }
 
+  // Build set of V positions that are perpendicular splits (sidewall-like)
+  const splitVPositions = new Set();
+  for (const split of result.perpSplits || []) {
+    splitVPositions.add(Math.round(split.v * 1000) / 1000);
+  }
+
   for (const section of result.sections) {
-    const driveU = section.u; // drive gable U position
-    const pulleyU = section.u + section.width; // pulley gable U position
+    const driveU = section.u;
+    const pulleyU = section.u + section.width;
+    const topV = section.v;
+    const bottomV = section.v + section.height;
     const suppressDrive = splitUPositions.has(Math.round(driveU * 1000) / 1000);
     const suppressPulley = splitUPositions.has(Math.round(pulleyU * 1000) / 1000);
-    drawSection(section, params, cosA, sinA, suppressDrive, suppressPulley);
+    const suppressTopSidewall = splitVPositions.has(Math.round(topV * 1000) / 1000);
+    const suppressBottomSidewall = splitVPositions.has(Math.round(bottomV * 1000) / 1000);
+    drawSection(section, params, cosA, sinA, suppressDrive, suppressPulley, suppressTopSidewall, suppressBottomSidewall);
   }
 
   // Draw parallel splits at the actual post position (not section grid boundary)
@@ -33,13 +43,16 @@ export function drawOptimizationResult(result, params) {
     drawUVLine(splitPostU, v0, splitPostU, v1, cosA, sinA, '#e74c3c', 3);
   }
 
-  // Draw perpendicular splits — run along U, parallel to sidewalls
+  // Draw perpendicular splits at actual post position (run along U, parallel to sidewalls)
   for (const split of result.perpSplits || []) {
-    drawUVLine(split.u, split.v, split.u + split.width, split.v, cosA, sinA, '#e67e22', 3);
+    const splitPostV = split.v + houseOffset;
+    const u0 = split.u + bayOffset;
+    const u1 = split.u + split.width;
+    drawUVLine(u0, splitPostV, u1, splitPostV, cosA, sinA, '#e67e22', 3);
   }
 }
 
-function drawSection(section, params, cosA, sinA, suppressDrive, suppressPulley) {
+function drawSection(section, params, cosA, sinA, suppressDrive, suppressPulley, suppressTopSW, suppressBottomSW) {
   // Section fill
   const corners = [
     { u: section.u, v: section.v },
@@ -70,11 +83,11 @@ function drawSection(section, params, cosA, sinA, suppressDrive, suppressPulley)
   const houseOffset = params.housePostOffset != null ? params.housePostOffset : 0;
 
   const uPositions = getUPositions(section, bayOffset);
-  const vPositions = getVPositions(section, houseOffset);
+  const vPositions = getVPositions(section, houseOffset, params.sidewallRule);
 
-  drawWalls(uPositions, vPositions, cosA, sinA, suppressDrive, suppressPulley);
+  drawWalls(uPositions, vPositions, cosA, sinA, suppressDrive, suppressPulley, suppressTopSW, suppressBottomSW);
   drawStructuralLines(uPositions, vPositions, cosA, sinA);
-  drawBracing(uPositions, vPositions, params.gableBracingDist, params.sidewallBracingDist, cosA, sinA, suppressDrive, suppressPulley);
+  drawBracing(uPositions, vPositions, params.gableBracingDist, params.sidewallBracingDist, cosA, sinA, suppressDrive, suppressPulley, suppressTopSW, suppressBottomSW);
   drawPosts(uPositions, vPositions, cosA, sinA);
   if (!suppressDrive) drawDriveGable(uPositions, vPositions, cosA, sinA);
   if (!suppressPulley) drawPulleyGable(uPositions, vPositions, cosA, sinA);
@@ -91,18 +104,46 @@ function getUPositions(section, bayOffset) {
   return positions;
 }
 
-// House post positions along V — sidewall walls ARE at first/last house post
-function getVPositions(section, houseOffset) {
-  const positions = [];
-  // houses+1 posts: first post at v + offset, then every houseWidth
-  for (let h = 0; h <= section.houses; h++) {
-    positions.push(section.v + houseOffset + h * section.houseWidth);
+// House post positions along V — peaks are anchored to tree rows, sidewalls offset outward
+// Peaks NEVER move. Sidewall rule only changes how far the sidewall (valley) sits from the first/last peak.
+// Posts: [sidewall, first peak, ...internal peaks..., last peak, far sidewall]
+function getVPositions(section, houseOffset, sidewallRule) {
+  const hw = section.houseWidth;
+
+  // Sidewall offset: distance from peak to sidewall (outward)
+  let sidewallOffset;
+  if (sidewallRule === 'normal') {
+    sidewallOffset = hw / 2;           // valley sits halfway between peaks
+  } else if (sidewallRule === 'adjusted') {
+    sidewallOffset = hw / 2 + 0.3048;  // half house + 1 ft
+  } else {
+    // 'flat' — full house width
+    sidewallOffset = hw;
   }
+
+  // First peak is anchored at the section grid position + houseOffset
+  // This ensures peaks always land on tree rows
+  const firstPeak = section.v + houseOffset;
+
+  // Sidewall is OUTWARD from first peak
+  const sidewallV = firstPeak - sidewallOffset;
+
+  const positions = [sidewallV]; // sidewall (valley)
+
+  // Peak posts: anchored to tree rows, spaced by houseWidth
+  for (let h = 0; h < section.houses; h++) {
+    positions.push(firstPeak + h * hw);
+  }
+
+  // Far sidewall: same offset outward from last peak
+  const lastPeak = firstPeak + (section.houses - 1) * hw;
+  positions.push(lastPeak + sidewallOffset);
+
   return positions;
 }
 
 // Sidewalls and gable walls — drawn at post grid boundaries
-function drawWalls(uPositions, vPositions, cosA, sinA, suppressDrive, suppressPulley) {
+function drawWalls(uPositions, vPositions, cosA, sinA, suppressDrive, suppressPulley, suppressTopSW, suppressBottomSW) {
   const u0 = uPositions[0];
   const u1 = uPositions[uPositions.length - 1];
   const v0 = vPositions[0];
@@ -111,9 +152,9 @@ function drawWalls(uPositions, vPositions, cosA, sinA, suppressDrive, suppressPu
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
   ctx.lineWidth = 2;
 
-  // Sidewalls (along U, at V edges)
-  drawUVLine(u0, v0, u1, v0, cosA, sinA);
-  drawUVLine(u0, v1, u1, v1, cosA, sinA);
+  // Sidewalls (along U, at V edges) — suppress at perpendicular splits
+  if (!suppressTopSW) drawUVLine(u0, v0, u1, v0, cosA, sinA);
+  if (!suppressBottomSW) drawUVLine(u0, v1, u1, v1, cosA, sinA);
 
   // Gables (along V, at U edges) — suppress at parallel splits
   if (!suppressDrive) drawUVLine(u0, v0, u0, v1, cosA, sinA);
@@ -145,7 +186,7 @@ function drawStructuralLines(uPositions, vPositions, cosA, sinA) {
 
 // Draw bracing — orange lines extending outward from perimeter posts
 // suppressDrive/suppressPulley: skip gable bracing at parallel split edges
-function drawBracing(uPositions, vPositions, gableBracingDist, sidewallBracingDist, cosA, sinA, suppressDrive, suppressPulley) {
+function drawBracing(uPositions, vPositions, gableBracingDist, sidewallBracingDist, cosA, sinA, suppressDrive, suppressPulley, suppressTopSW, suppressBottomSW) {
   if (getScale() * state.zoom <= 2) return;
 
   const u0 = uPositions[0];
@@ -156,16 +197,21 @@ function drawBracing(uPositions, vPositions, gableBracingDist, sidewallBracingDi
   ctx.strokeStyle = '#f39c12';
   ctx.lineWidth = 1.5;
 
-  // Sidewall bracing — posts along top (v0) and bottom (v1) sidewalls
+  // Sidewall bracing — skip at perpendicular splits (interior connection)
   if (sidewallBracingDist > 0) {
-    for (const u of uPositions) {
-      drawUVLine(u, v0, u, v0 - sidewallBracingDist, cosA, sinA);
-      drawUVLine(u, v1, u, v1 + sidewallBracingDist, cosA, sinA);
+    if (!suppressTopSW) {
+      for (const u of uPositions) {
+        drawUVLine(u, v0, u, v0 - sidewallBracingDist, cosA, sinA);
+      }
+    }
+    if (!suppressBottomSW) {
+      for (const u of uPositions) {
+        drawUVLine(u, v1, u, v1 + sidewallBracingDist, cosA, sinA);
+      }
     }
   }
 
-  // Gable bracing — posts along left (u0) and right (u1) gables
-  // Skip at parallel splits (interior connection, not exposed edge)
+  // Gable bracing — skip at parallel splits (interior connection)
   if (gableBracingDist > 0) {
     if (!suppressDrive) {
       for (const v of vPositions) {

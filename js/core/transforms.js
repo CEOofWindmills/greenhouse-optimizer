@@ -26,6 +26,7 @@ export function getParams() {
     treeSpacing: parseFloat(document.getElementById('tree-spacing').value),
     treeDirection: parseFloat(document.getElementById('tree-direction').value) * Math.PI / 180,
     showTrees: document.getElementById('show-trees').checked,
+    sidewallRule: document.getElementById('sidewall-rule').value, // 'normal' | 'adjusted' | 'flat'
     minHouse: parseFloat(document.getElementById('min-house').value),
     maxHouse: parseFloat(document.getElementById('max-house').value),
     minBay: parseFloat(document.getElementById('min-bay').value),
