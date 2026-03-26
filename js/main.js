@@ -3,6 +3,7 @@ import { draw } from './render/draw.js';
 import { initInputHandlers } from './ui/input-handlers.js';
 import { initButtons } from './ui/buttons.js';
 import { initMap, syncCanvasToMap } from './map/leaflet-map.js';
+import { initTreeGridEntity } from './entities/tree-grid-entity.js';
 
 // Initialize canvas
 const container = document.getElementById('canvas-container');
@@ -24,6 +25,7 @@ window.addEventListener('resize', resizeCanvas);
 // Wire up UI
 initInputHandlers();
 initButtons();
+initTreeGridEntity();
 
 // Initialize Leaflet map (starts hidden)
 initMap();

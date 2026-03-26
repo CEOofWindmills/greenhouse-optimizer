@@ -106,9 +106,11 @@ export function optimize() {
       // Skip if margins consume the entire parcel
       if (adjustedBounds.minX >= adjustedBounds.maxX || adjustedBounds.minY >= adjustedBounds.maxY) continue;
 
-      // Snap grid start to first cell inside adjusted bounds
-      const startU = Math.ceil(adjustedBounds.minX / baySize) * baySize;
-      const startV = Math.ceil(adjustedBounds.minY / houseWidth) * houseWidth;
+      // Snap grid start to first cell inside adjusted bounds, incorporating tree grid offset
+      const gridOffsetU = state.treeGridOffset.u % baySize;
+      const gridOffsetV = state.treeGridOffset.v % houseWidth;
+      const startU = Math.ceil((adjustedBounds.minX - gridOffsetU) / baySize) * baySize + gridOffsetU;
+      const startV = Math.ceil((adjustedBounds.minY - gridOffsetV) / houseWidth) * houseWidth + gridOffsetV;
 
       const result = greedyPlace(
         rotatedPoly, startU, startV, adjustedBounds,

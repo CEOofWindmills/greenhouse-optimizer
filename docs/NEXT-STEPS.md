@@ -1,92 +1,33 @@
-# Next Steps - Critical Issue: Boundary Enforcement
+# Next Steps & Status
 
-## The Problem
+## Boundary Enforcement — IMPLEMENTED
 
-The greenhouse footprint (posts, bracing, sidewall offsets) currently extends OUTSIDE the land boundary. The optimizer places sections based on grid cells that are >50% inside the land, but doesn't account for:
+The greenhouse footprint (posts, bracing, sidewall offsets) previously extended outside the land boundary. This has been addressed with two mechanisms:
 
-1. **Bay post offset** — posts are offset from the grid edge by `treeSpacing / 2` (default 1.5m)
-2. **Sidewall rule offset** — the sidewall extends outward from the first/last peak by `sidewallOffset` (varies by rule: half house, half house + 1ft, or full house width)
-3. **Gable bracing** — extends beyond the gable wall by `gableBracingDist` (default 1.5m)
-4. **Sidewall bracing** — extends beyond the sidewall by `sidewallBracingDist` (default 1.5m)
+### What Was Implemented
 
-All of these can push the physical greenhouse footprint outside the drawn land boundary.
+1. **Bounds insetting** (`computeMargins()` in optimizer.js): Before running the placer, the land bounds are shrunk by asymmetric margins that account for structural offsets:
+   - **U direction**: `marginMinU = max(0, gableBracingDist - bayOffset)`, `marginMaxU = bayOffset + gableBracingDist`
+   - **V direction**: `marginMinV = max(0, sidewallOffset + sidewallBracingDist - houseOffset)`, `marginMaxV = max(0, houseOffset + sidewallOffset + sidewallBracingDist - houseWidth)`
+   - The grid starts from the inset bounds, so sections are placed within the smaller area.
 
-## The Solution (Agreed Approach)
+2. **Iterative pruning** (`pruneFootprintOutsideLand()` in greedy-placer.js): After the coverage grid is built, boundary cells are iteratively checked against the actual land polygon (not just bounds). Each boundary cell's structural footprint corners and edge midpoints (8 points) are tested. Cells with any point outside the land or inside an exclusion zone are removed. The process repeats until stable, since removing a cell can expose new boundaries.
 
-**Inset the land boundary polygon** before running the optimizer. Shrink the polygon inward by the maximum margin amount so the optimizer works on a smaller area that already accounts for all offsets.
+### Limitations
+- The bounds insetting handles rectangular and near-rectangular parcels well.
+- For truly irregular concave polygons, a full polygon inset algorithm (Minkowski-style) would be more precise, but the iterative pruning compensates by catching cases the simple bounds inset misses.
+- The pruning checks 8 sample points per cell footprint — extremely narrow protrusions between sample points could theoretically slip through.
 
-### Margin Calculations
-
-**U direction (along tree rows, bay direction):**
-```
-marginU = bayPostOffset + gableBracingDist
-```
-Default: 1.5 + 1.5 = 3.0m inset on each side
-
-**V direction (perpendicular to tree rows, house direction):**
-```
-sidewallOffset = depends on sidewallRule:
-  - normal:   houseWidth / 2
-  - adjusted: houseWidth / 2 + 0.3048
-  - flat:     houseWidth
-
-marginV = sidewallOffset + sidewallBracingDist
-```
-Default (flat, 5m house): 5.0 + 1.5 = 6.5m inset on each side
-
-### Implementation Plan
-
-1. **Add polygon inset function** to `geometry.js`
-   - Takes a polygon and inset distances (marginU, marginV in rotated UV space)
-   - Returns a new polygon shrunk inward
-   - This is a "polygon offset" or "buffer" operation (inward)
-   - For convex polygons: move each edge inward by the margin, find new intersections
-   - For concave polygons: more complex — may need to handle self-intersections
-
-2. **In `optimizer.js`**, before the main loop:
-   - Calculate marginU and marginV from current params
-   - Rotate the land polygon to UV space (already done)
-   - Inset the rotated polygon by marginU (U edges) and marginV (V edges)
-   - Use the inset polygon for grid coverage testing
-   - Sections placed within the inset polygon will automatically have room for offsets + bracing
-
-3. **The grid coverage check stays as-is** (>50% threshold) — it just operates on the smaller polygon
-
-4. **Section rendering stays as-is** — sections are placed within the inset area, but rendered with full offsets/bracing which will now fit within the original boundary
-
-### Considerations
-
-- The inset is **directional** (different in U vs V), not uniform. This means we need an anisotropic polygon offset, OR we can do the inset in UV space where U and V margins are applied to the respective edges.
-- For a simple rectangular parcel, this is trivial: just shrink the bounds.
-- For irregular polygons, a proper polygon inset algorithm is needed. The Clipper library handles this well, but we're vanilla JS — implement a basic version or use the Minkowski difference approach.
-- **Simpler alternative**: Instead of insetting the polygon, just adjust the grid start positions inward by the margins. This works for convex parcels but won't handle concave boundaries correctly.
-
-### Simplest First Pass
-
-For the initial implementation:
-1. After rotating the polygon and computing bounds, shrink the bounds by margins:
-   ```
-   adjustedMinX = rBounds.minX + marginU
-   adjustedMaxX = rBounds.maxX - marginU
-   adjustedMinY = rBounds.minY + marginV
-   adjustedMaxY = rBounds.maxY - marginV
-   ```
-2. Start the grid from `adjustedMinX` instead of `rBounds.minX`
-3. This handles rectangular and near-rectangular parcels
-4. For truly irregular parcels, implement full polygon insetting later
-
-### What Was Tried & Failed
-
+### What Was Tried & Failed (Historical)
 A previous attempt tried:
 1. Changing grid coverage threshold from >0.5 to >0.99 — killed edge cells due to floating point
 2. Adding `rectFullyInLand()` with margins on every section — grid starts at boundary, so sections at edges always had margins extending outside. Every section got rejected.
-3. Root cause: tried to validate margins AFTER placement instead of preventing boundary violations BEFORE placement by using an inset polygon.
+3. Root cause: tried to validate margins AFTER placement instead of preventing boundary violations BEFORE placement.
 
 ---
 
-## Other Pending Items (Lower Priority)
+## Completed Features
 
-### Already Implemented (for reference)
 - [x] Modular vanilla JS architecture (was single HTML)
 - [x] Post grid rendering (plan view, like AutoCAD)
 - [x] Bay post offset (posts between trees, not on them)
@@ -100,12 +41,20 @@ A previous attempt tried:
 - [x] Ortho mode (snap to row/perp axes like AutoCAD)
 - [x] Demo button
 - [x] Greenhouse calcs panel (post counts, dimensions, zone areas)
+- [x] Boundary enforcement (bounds insetting + iterative pruning)
+- [x] Leaflet satellite map integration with address geocoding
+- [x] Grid-based no-splits placement mode (perimeter tracing, flood fill)
+- [x] Show/hide trees toggle
+- [x] No Parallel Splits / No Perp Splits toggles with conditional UI
+- [x] Zoom In/Out/Fit toolbar buttons
+- [x] Auto-reoptimize on parameter changes
 
-### Future Work
-- [ ] **Boundary enforcement** (this document — CRITICAL)
-- [ ] Google Maps integration for land tracing
+## Future Work
+
+- [ ] Migrate from Leaflet/Esri tiles to Google Maps API (better imagery, street view, etc.)
 - [ ] More sophisticated jog/L-shape handling
-- [ ] Perpendicular split generation in the placer (currently only parallel)
+- [ ] Full polygon inset algorithm for concave parcels (Clipper-style)
+- [ ] Perpendicular split generation in the placer (currently only parallel in section mode)
 - [ ] Save/load parcel configurations
 - [ ] Export to DXF/AutoCAD format
 - [ ] Multiple parcel comparison

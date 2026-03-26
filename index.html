@@ -13,13 +13,10 @@
 <div id="sidebar">
   <h2>Greenhouse Optimizer</h2>
 
-  <h3>Drawing Tools</h3>
+  <h3>Actions</h3>
   <div class="btn-row">
-    <button class="btn-primary" id="btn-draw-land" title="Click points to define land boundary">Draw Land</button>
-    <button class="btn-secondary" id="btn-draw-exclusion" title="Draw exclusion zones (buildings, ponds, etc)">Exclusion Zone</button>
     <button class="btn-danger" id="btn-clear">Clear All</button>
     <button class="btn-secondary" id="btn-demo" title="Load a demo land parcel">Demo</button>
-    <button class="btn-secondary" id="btn-ortho" title="Toggle ortho mode (snap to row direction)">Ortho: Off</button>
   </div>
 
   <h3>Tree Rows</h3>
@@ -181,12 +178,39 @@
   <div id="map-container" style="position:absolute; inset:0; z-index:0; display:none;"></div>
   <canvas id="canvas" style="position:relative; z-index:1;"></canvas>
   <div id="mode-indicator" class="mode-indicator" style="display:none"></div>
+  <div id="tool-bar">
+    <button class="tool-btn active" id="tool-pointer" title="Pointer (V)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M3 1L3 12L6.5 8.5L10 14L12 13L8.5 7L13 7Z"/>
+      </svg>
+    </button>
+    <button class="tool-btn" id="tool-draw-land" title="Draw Land (L)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <polygon points="3,12 8,2 13,12 10,14 6,14"/>
+      </svg>
+    </button>
+    <button class="tool-btn" id="tool-draw-exclusion" title="Exclusion Zone (E)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="3" y="3" width="10" height="10" rx="1"/>
+        <line x1="5" y1="5" x2="11" y2="11"/>
+        <line x1="11" y1="5" x2="5" y2="11"/>
+      </svg>
+    </button>
+    <div class="tool-separator"></div>
+    <button class="tool-btn" id="tool-ortho" title="Ortho (F8)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M3 13L3 3L13 3"/>
+        <path d="M3 8L8 3" stroke-dasharray="2 2"/>
+      </svg>
+    </button>
+  </div>
   <div class="toolbar">
     <div id="search-bar" style="display:none; margin-bottom:4px;">
       <input type="text" id="address-input" placeholder="Search address..." style="width:200px;padding:4px 8px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;border-radius:4px;font-size:12px">
       <button class="btn-secondary" id="btn-search" style="padding:4px 8px">Go</button>
     </div>
     <button class="btn-secondary" id="btn-map">Map: Off</button>
+    <button class="btn-secondary" id="btn-map-lock" style="display:none">Lock Map</button>
     <button class="btn-secondary" id="btn-zoom-in">Zoom +</button>
     <button class="btn-secondary" id="btn-zoom-out">Zoom -</button>
     <button class="btn-secondary" id="btn-fit">Fit</button>

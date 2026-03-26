@@ -25,8 +25,12 @@ export function drawTreeRows(params) {
     minV = Math.min(minV, v); maxV = Math.max(maxV, v);
   }
 
+  // Apply tree grid offset (draggable in UV space)
+  const offsetU = state.treeGridOffset.u;
+  const offsetV = state.treeGridOffset.v;
+
   // Draw rows (perpendicular lines spaced by treeRowSpacing)
-  const startV = Math.floor(minV / params.treeRowSpacing) * params.treeRowSpacing;
+  const startV = Math.floor((minV - offsetV) / params.treeRowSpacing) * params.treeRowSpacing + offsetV;
   ctx.strokeStyle = 'rgba(46, 204, 113, 0.15)';
   ctx.lineWidth = 1;
 
@@ -45,7 +49,7 @@ export function drawTreeRows(params) {
 
     // Draw individual trees along the row
     if (getScale() * state.zoom > 2) {
-      const startU = Math.floor(minU / params.treeSpacing) * params.treeSpacing;
+      const startU = Math.floor((minU - offsetU) / params.treeSpacing) * params.treeSpacing + offsetU;
       for (let u = startU; u <= maxU; u += params.treeSpacing) {
         const wx = u * cosA - v * sinA;
         const wy = u * sinA + v * cosA;

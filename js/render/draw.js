@@ -3,6 +3,7 @@ import { getParams, metersToScreen } from '../core/transforms.js';
 import { drawGrid } from './grid.js';
 import { drawTreeRows } from './trees.js';
 import { drawOptimizationResult } from './sections.js';
+import { getEntities, getTypeHandler } from '../core/entities.js';
 
 export function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -15,6 +16,14 @@ export function draw() {
   const params = getParams();
   if (params.showTrees && state.landPolygon.length > 2) {
     drawTreeRows(params);
+  }
+
+  // Render entity selection state (e.g., highlighted tree grid when selected)
+  for (const entity of getEntities()) {
+    if (entity.selected) {
+      const handler = getTypeHandler(entity.type);
+      if (handler && handler.renderSelection) handler.renderSelection(entity, params);
+    }
   }
 
   // Exclusion zones

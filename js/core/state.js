@@ -18,7 +18,11 @@ export const state = {
 
   // Map
   mapActive: false,
+  mapLocked: false, // When true, map is frozen and canvas gets pointer events
   refLatLng: null, // { lat, lng } — anchor point where lat/lng = meters (0,0)
+
+  // Tree grid offset in rotated UV space (draggable)
+  treeGridOffset: { u: 0, v: 0 },
 };
 
 // Canvas references — set once in main.js

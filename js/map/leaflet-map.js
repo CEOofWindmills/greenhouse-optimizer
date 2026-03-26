@@ -136,8 +136,40 @@ export async function searchAddress(query) {
   }
 }
 
+export function setMapLocked(locked) {
+  state.mapLocked = locked;
+  if (!map) return;
+
+  if (locked) {
+    // Freeze Leaflet — disable all interaction handlers
+    map.dragging.disable();
+    map.scrollWheelZoom.disable();
+    map.doubleClickZoom.disable();
+    map.touchZoom.disable();
+    map.boxZoom.disable();
+    map.keyboard.disable();
+  } else {
+    // Unfreeze Leaflet
+    map.dragging.enable();
+    map.scrollWheelZoom.enable();
+    map.doubleClickZoom.enable();
+    map.touchZoom.enable();
+    map.boxZoom.enable();
+    map.keyboard.enable();
+  }
+
+  updateCanvasPointerEvents();
+
+  // Update lock button
+  const btn = document.getElementById('btn-map-lock');
+  if (btn) {
+    btn.textContent = locked ? 'Unlock Map' : 'Lock Map';
+    btn.style.background = locked ? '#e94560' : '';
+  }
+}
+
 // When map is active: canvas needs pointer-events:none so Leaflet gets pan/zoom,
-// BUT when drawing, canvas needs pointer-events:auto for click capture.
+// BUT when drawing or map is locked, canvas needs pointer-events:auto.
 // Call this whenever mode changes.
 export function updateCanvasPointerEvents() {
   const canvas = document.getElementById('canvas');
@@ -146,11 +178,11 @@ export function updateCanvasPointerEvents() {
     return;
   }
 
-  // Drawing modes need canvas to capture clicks
-  if (state.mode === 'draw-land' || state.mode === 'draw-exclusion') {
+  // Locked map or drawing modes — canvas captures events
+  if (state.mapLocked || state.mode === 'draw-land' || state.mode === 'draw-exclusion') {
     canvas.style.pointerEvents = 'auto';
   } else {
-    // Idle — let Leaflet handle all interactions (pan/zoom)
+    // Idle, unlocked — let Leaflet handle all interactions (pan/zoom)
     canvas.style.pointerEvents = 'none';
   }
 }

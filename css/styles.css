@@ -35,7 +35,7 @@ button {
 #canvas-container {
   flex: 1; position: relative; overflow: hidden; background: #0d1117;
 }
-canvas { display: block; cursor: crosshair; }
+canvas { display: block; cursor: default; }
 
 #status-bar {
   position: absolute; bottom: 0; left: 0; right: 0;
@@ -46,7 +46,7 @@ canvas { display: block; cursor: crosshair; }
 #status-bar span { color: #0f9b8e; }
 
 .mode-indicator {
-  position: absolute; top: 12px; left: 12px;
+  position: absolute; top: 12px; left: 56px;
   background: rgba(233, 69, 96, 0.9); color: white;
   padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 600;
   z-index: 10;
@@ -70,3 +70,18 @@ canvas { display: block; cursor: crosshair; }
   z-index: 10;
 }
 .toolbar button { font-size: 11px; padding: 4px 10px; }
+
+#tool-bar {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 4px;
+  background: rgba(22, 33, 62, 0.95); border: 1px solid #0f3460;
+  border-radius: 6px; padding: 6px; z-index: 10;
+}
+.tool-btn {
+  width: 34px; height: 34px; background: transparent; border: 1px solid transparent;
+  border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: #a0a0b0; padding: 0;
+}
+.tool-btn:hover { background: #0f3460; color: #e0e0e0; }
+.tool-btn.active { background: #0f9b8e; color: white; border-color: #0f9b8e; }
+.tool-separator { height: 1px; background: #0f3460; margin: 2px 0; }
