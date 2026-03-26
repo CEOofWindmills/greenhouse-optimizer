@@ -143,10 +143,11 @@ function drawInProgressVertices() {
 function drawMeasurements() {
   // Draw saved measurements (if visible), resolving snap refs for attached dimensions
   if (state.showMeasurements) {
-    for (const m of state.measurements) {
+    for (let i = 0; i < state.measurements.length; i++) {
+      const m = state.measurements[i];
       const start = resolveSnapRef(m.startRef) || m.start;
       const end = resolveSnapRef(m.endRef) || m.end;
-      drawMeasurementLine(start, end);
+      drawMeasurementLine(start, end, false, i === state.selectedMeasurement);
     }
   }
 
@@ -179,16 +180,18 @@ function drawMeasurements() {
   }
 }
 
-function drawMeasurementLine(start, end, inProgress) {
+function drawMeasurementLine(start, end, inProgress, selected) {
   const s1 = metersToScreen(start.x, start.y);
   const s2 = metersToScreen(end.x, end.y);
+  const color = selected ? '#0f9b8e' : inProgress ? 'rgba(255, 255, 255, 0.6)' : '#ffffff';
+  const lineWidth = selected ? 2.5 : 1.5;
 
   // Line
   ctx.beginPath();
   ctx.moveTo(s1.x, s1.y);
   ctx.lineTo(s2.x, s2.y);
-  ctx.strokeStyle = inProgress ? 'rgba(255, 255, 255, 0.6)' : '#ffffff';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
   ctx.setLineDash(inProgress ? [6, 4] : []);
   ctx.stroke();
   ctx.setLineDash([]);
@@ -197,14 +200,15 @@ function drawMeasurementLine(start, end, inProgress) {
   const dx = s2.x - s1.x, dy = s2.y - s1.y;
   const len = Math.hypot(dx, dy);
   if (len < 1) return;
-  const nx = -dy / len * 6, ny = dx / len * 6; // perpendicular, 6px
+  const tickLen = selected ? 8 : 6;
+  const nx = -dy / len * tickLen, ny = dx / len * tickLen;
   ctx.beginPath();
   ctx.moveTo(s1.x + nx, s1.y + ny);
   ctx.lineTo(s1.x - nx, s1.y - ny);
   ctx.moveTo(s2.x + nx, s2.y + ny);
   ctx.lineTo(s2.x - nx, s2.y - ny);
-  ctx.strokeStyle = inProgress ? 'rgba(255, 255, 255, 0.6)' : '#ffffff';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
   ctx.stroke();
 
   // Distance label at midpoint
@@ -218,7 +222,7 @@ function drawMeasurementLine(start, end, inProgress) {
   const pad = 3;
 
   // Background pill
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillStyle = selected ? 'rgba(15, 155, 142, 0.85)' : 'rgba(0, 0, 0, 0.7)';
   ctx.beginPath();
   ctx.roundRect(midX - textWidth / 2 - pad, midY - 7 - pad, textWidth + pad * 2, 14 + pad * 2, 3);
   ctx.fill();

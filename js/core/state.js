@@ -29,6 +29,7 @@ export const state = {
   measureStart: null,    // {x,y} in meters — in-progress start point
   measureStartRef: null, // snap reference for in-progress start
   snapPoint: null,       // {x, y, type, ref} — current snap target for rendering
+  selectedMeasurement: -1, // index of selected measurement, -1 = none
   showMeasurements: true, // toggle visibility of saved measurements
 
   // Tree grid offset in rotated UV space (draggable)

@@ -6,6 +6,29 @@ import { updateCanvasPointerEvents } from '../map/leaflet-map.js';
 import { hitTestAll, selectEntity, deselectAll, getSelected, getTypeHandler } from '../core/entities.js';
 import { setActiveTool } from '../core/tools.js';
 import { optimize } from '../engine/optimizer.js';
+import { resolveSnapRef } from '../core/snap.js';
+
+// Hit-test measurement lines — returns index or -1
+function hitTestMeasurement(screenX, screenY) {
+  const threshold = 10;
+  let bestIdx = -1, bestDist = threshold;
+  for (let i = 0; i < state.measurements.length; i++) {
+    const m = state.measurements[i];
+    const start = resolveSnapRef(m.startRef) || m.start;
+    const end = resolveSnapRef(m.endRef) || m.end;
+    const s1 = metersToScreen(start.x, start.y);
+    const s2 = metersToScreen(end.x, end.y);
+    const dx = s2.x - s1.x, dy = s2.y - s1.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) continue;
+    let t = ((screenX - s1.x) * dx + (screenY - s1.y) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const cx = s1.x + t * dx, cy = s1.y + t * dy;
+    const dist = Math.hypot(screenX - cx, screenY - cy);
+    if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+  }
+  return bestIdx;
+}
 
 // Snap a point to the nearest ortho direction (along or perpendicular to tree rows)
 // relative to an anchor point
@@ -343,6 +366,17 @@ function onMouseDown(e) {
     const sy2 = e.clientY - rect2.top;
     if (hitTestVertex(sx2, sy2)) return; // vertex takes priority — let dblclick handle it
 
+    // Check measurement selection
+    if (state.showMeasurements) {
+      const mIdx = hitTestMeasurement(sx2, sy2);
+      if (mIdx >= 0) {
+        state.selectedMeasurement = mIdx;
+        draw();
+        return;
+      }
+    }
+    state.selectedMeasurement = -1;
+
     const params = getParams();
     const hit = hitTestAll(state.mouse.x, state.mouse.y, params);
     if (hit) {
@@ -560,9 +594,20 @@ function onKeyDown(e) {
       return;
     }
     deselectAll();
+    state.selectedMeasurement = -1;
     setActiveTool('pointer');
     state.currentPolygon = [];
     draw();
+  }
+  // Delete selected measurement
+  if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedMeasurement >= 0) {
+    state.measurements.splice(state.selectedMeasurement, 1);
+    state.selectedMeasurement = -1;
+    if (state.measurements.length === 0) {
+      document.getElementById('btn-toggle-dims').style.display = 'none';
+    }
+    draw();
+    return;
   }
   // F8 toggles ortho mode (like AutoCAD)
   if (e.key === 'F8') {
