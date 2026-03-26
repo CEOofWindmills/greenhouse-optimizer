@@ -1,5 +1,5 @@
 import { state } from '../core/state.js';
-import { polygonArea, rectCoverageInLand } from '../core/geometry.js';
+import { polygonArea, rectCoverageInLand, pointInPolygon, pointInAnyExclusion } from '../core/geometry.js';
 
 // Balanced placement algorithm
 // Instead of greedy "take max first", distributes bays evenly across sections
@@ -20,6 +20,9 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
       grid[i][j] = coverage > 0.25 ? 1 : 0;
     }
   }
+
+  // Prune boundary cells whose structural footprint (sidewalls + bracing) exceeds land polygon
+  pruneFootprintOutsideLand(grid, gridU, gridV, uSpacing, vSpacing, params);
 
   // No-splits mode: use simple grid-based perimeter tracing (like the reference)
   const noSplitsMode = params.noParallelSplits && params.noPerpSplits;
@@ -473,4 +476,98 @@ function tracePerimeter(activeGrid, numCols, numRows) {
   }
 
   return path;
+}
+
+// ============================================================
+// Iterative pruning: remove boundary cells whose structural footprint
+// (bay posts + sidewalls + bracing) extends outside the land polygon.
+// Repeats until stable, since removing a cell can expose new boundaries.
+// ============================================================
+function pruneFootprintOutsideLand(grid, gridU, gridV, uSpacing, vSpacing, params) {
+  const numCols = gridU.length;
+  const numRows = gridV.length;
+  if (numCols === 0 || numRows === 0) return;
+
+  const cosA = Math.cos(params.treeDirection);
+  const sinA = Math.sin(params.treeDirection);
+  const landPoly = state.landPolygon;
+
+  const bayOffset = params.bayPostOffset != null ? params.bayPostOffset : params.treeSpacing / 2;
+  const houseOffset = params.housePostOffset != null ? params.housePostOffset : 0;
+  const hw = vSpacing;
+
+  let swOffset;
+  if (params.sidewallRule === 'normal') swOffset = hw / 2;
+  else if (params.sidewallRule === 'adjusted') swOffset = hw / 2 + 0.3048;
+  else swOffset = hw; // flat
+
+  const gableDist = params.gableBracingDist;
+  const swDist = params.sidewallBracingDist;
+
+  const startU = gridU[0];
+  const startV = gridV[0];
+
+  // Convert UV point to world space and check if inside land (and not in exclusion zones)
+  function isInsideLand(u, v) {
+    const wx = u * cosA - v * sinA;
+    const wy = u * sinA + v * cosA;
+    return pointInPolygon(wx, wy, landPoly) && !pointInAnyExclusion(wx, wy);
+  }
+
+  // Bay post U at column boundary
+  const bayPostU = (col) => startU + col * uSpacing + bayOffset;
+  // Peak V at row
+  const peakV = (row) => startV + row * hw + houseOffset;
+
+  let changed = true;
+  let iterations = 0;
+  const maxIterations = Math.max(numCols, numRows) + 5; // safety limit
+
+  while (changed && iterations++ < maxIterations) {
+    changed = false;
+
+    for (let col = 0; col < numCols; col++) {
+      for (let row = 0; row < numRows; row++) {
+        if (!grid[col][row]) continue;
+
+        // Determine if this cell is on a boundary edge
+        const isLeft = col === 0 || !grid[col - 1][row];
+        const isRight = col === numCols - 1 || !grid[col + 1][row];
+        const isTop = row === 0 || !grid[col][row - 1];
+        const isBottom = row === numRows - 1 || !grid[col][row + 1];
+
+        // Only boundary cells need checking — interior cells are enclosed
+        if (!isLeft && !isRight && !isTop && !isBottom) continue;
+
+        // Compute structural footprint extremes for this cell
+        const uMin = bayPostU(col) - (isLeft ? gableDist : 0);
+        const uMax = bayPostU(col + 1) + (isRight ? gableDist : 0);
+        const vMin = peakV(row) - swOffset - (isTop ? swDist : 0);
+        const vMax = peakV(row) + swOffset + (isBottom ? swDist : 0);
+
+        // Check corners and edge midpoints of the structural footprint
+        const checkPoints = [
+          [uMin, vMin], [uMax, vMin],  // top edge corners
+          [uMin, vMax], [uMax, vMax],  // bottom edge corners
+          [(uMin + uMax) / 2, vMin],   // top edge midpoint
+          [(uMin + uMax) / 2, vMax],   // bottom edge midpoint
+          [uMin, (vMin + vMax) / 2],   // left edge midpoint
+          [uMax, (vMin + vMax) / 2],   // right edge midpoint
+        ];
+
+        let allInside = true;
+        for (const [u, v] of checkPoints) {
+          if (!isInsideLand(u, v)) {
+            allInside = false;
+            break;
+          }
+        }
+
+        if (!allInside) {
+          grid[col][row] = 0;
+          changed = true;
+        }
+      }
+    }
+  }
 }

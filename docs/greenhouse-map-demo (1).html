@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Greenhouse Optimizer — Satellite View</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0e14;
+    --panel: #111820;
+    --panel-border: #1e2a38;
+    --text: #c8d0dc;
+    --text-dim: #5a6a7e;
+    --accent: #0f9b8e;
+    --accent-bright: #14c4b4;
+    --red: #e94560;
+    --blue: #3498db;
+    --purple: #9b59b6;
+    --orange: #e67e22;
+    --green: #2ecc71;
+  }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    min-width: 320px;
+    background: var(--panel);
+    border-right: 1px solid var(--panel-border);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    overflow-y: auto;
+  }
+
+  .sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .sidebar-header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-bright);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .sidebar-header p {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent-bright); }
+  .btn.active { border-color: var(--accent); background: rgba(15,155,142,0.15); color: var(--accent-bright); }
+  .btn.red { border-color: var(--red); color: var(--red); }
+  .btn.red:hover { background: rgba(233,69,96,0.15); }
+  .btn.green { border-color: var(--green); color: var(--green); }
+  .btn.green:hover { background: rgba(46,204,113,0.15); }
+
+  .input-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .input-group label {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .input-group input, .input-group select {
+    width: 100px;
+    padding: 6px 8px;
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    text-align: right;
+  }
+
+  .input-group input:focus, .input-group select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .metric {
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 10px;
+  }
+
+  .metric-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .metric-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--accent-bright);
+    margin-top: 2px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .metric-unit {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .vertex-list {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    max-height: 120px;
+    overflow-y: auto;
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 8px;
+  }
+
+  .vertex-item {
+    padding: 2px 0;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .vertex-idx { color: var(--red); }
+  .vertex-coord { color: var(--text); }
+
+  .status-msg {
+    padding: 12px 20px;
+    font-size: 12px;
+    color: var(--accent-bright);
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(15,155,142,0.08);
+    border-top: 1px solid var(--panel-border);
+    margin-top: auto;
+  }
+
+  /* Map */
+  .map-container {
+    flex: 1;
+    position: relative;
+  }
+
+  #map {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Override Leaflet tiles for dark feel */
+  .leaflet-container { background: var(--bg); }
+
+  .crosshair-cursor { cursor: crosshair !important; }
+  .crosshair-cursor .leaflet-grab { cursor: crosshair !important; }
+  .crosshair-cursor .leaflet-interactive { cursor: crosshair !important; }
+
+  /* Map overlay info */
+  .map-overlay {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1000;
+    background: rgba(10,14,20,0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+
+  .map-overlay .coord { color: var(--text); }
+
+  .mode-badge {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: rgba(233,69,96,0.9);
+    backdrop-filter: blur(8px);
+    border-radius: 20px;
+    padding: 8px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+    display: none;
+  }
+
+  .mode-badge.active { display: block; }
+
+  .search-box {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .search-box input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+  }
+
+  .search-box input:focus { outline: none; border-color: var(--accent); }
+
+  .search-box button {
+    padding: 8px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    background: rgba(15,155,142,0.15);
+    color: var(--accent-bright);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* Scrollbar */
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: var(--panel); }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>Coverage Optimizer</h1>
+    <p>Satellite View — Draw on Map</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Location</div>
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Address or coordinates..." value="Brantford, ON">
+      <button onclick="searchLocation()">Go</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tools</div>
+    <div class="btn-row">
+      <button class="btn" id="btnDrawLand" onclick="startDrawLand()">Draw Land</button>
+      <button class="btn" id="btnDrawExclude" onclick="startDrawExclusion()">Exclusion</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn red" onclick="clearAll()">Clear All</button>
+      <button class="btn green" onclick="runOptimize()">Optimize</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="loadDemo()">Demo Parcel</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tree Rows</div>
+    <div class="input-group">
+      <label>Row spacing (m)</label>
+      <input type="number" id="treeRowSpacing" value="5" step="0.5" min="1">
+    </div>
+    <div class="input-group">
+      <label>Tree spacing (m)</label>
+      <input type="number" id="treeSpacing" value="3" step="0.5" min="1">
+    </div>
+    <div class="input-group">
+      <label>Row direction (°)</label>
+      <input type="number" id="treeDirection" value="0" step="5" min="0" max="360">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Greenhouse</div>
+    <div class="input-group">
+      <label>House width (m)</label>
+      <input type="number" id="houseWidth" value="5" step="0.5" min="3">
+    </div>
+    <div class="input-group">
+      <label>Bay size (m)</label>
+      <input type="number" id="baySize" value="6" step="1" min="3">
+    </div>
+    <div class="input-group">
+      <label>Max shaft (m)</label>
+      <input type="number" id="maxShaft" value="108" step="1">
+    </div>
+    <div class="input-group">
+      <label>Max cable (m)</label>
+      <input type="number" id="maxCable" value="76" step="1">
+    </div>
+    <div class="input-group">
+      <label>Sidewall rule</label>
+      <select id="sidewallRule">
+        <option value="flat" selected>Flat roof</option>
+        <option value="normal">Normal</option>
+        <option value="adjusted">Adjusted</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="section" id="vertexSection" style="display:none;">
+    <div class="section-title">Vertices (meters from anchor)</div>
+    <div class="vertex-list" id="vertexList"></div>
+  </div>
+
+  <div class="section" id="metricsSection" style="display:none;">
+    <div class="section-title">Results</div>
+    <div class="metrics-grid">
+      <div class="metric">
+        <div class="metric-label">Land Area</div>
+        <div class="metric-value" id="metricArea">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Coverage</div>
+        <div class="metric-value" id="metricCoverage">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Sections</div>
+        <div class="metric-value" id="metricSections">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Houses × Bays</div>
+        <div class="metric-value" id="metricGrid">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-msg" id="statusMsg">Click "Draw Land" to trace a parcel boundary on the satellite map.</div>
+</div>
+
+<div class="map-container">
+  <div class="mode-badge" id="modeBadge">DRAWING — Click to place points, click first point to close</div>
+  <div id="map"></div>
+  <div class="map-overlay" id="mapOverlay">
+    <span class="coord" id="coordDisplay">—</span>
+  </div>
+</div>
+
+<script>
+// =============================================
+// STATE
+// =============================================
+const state = {
+  mode: 'idle', // idle | draw-land | draw-exclusion
+  drawPoints: [],     // [{lat, lng}]
+  landLatLngs: [],    // Closed polygon in lat/lng
+  landMeters: [],     // Converted to meters
+  exclusions: [],
+  anchor: null,       // First land vertex — reference for meter conversion
+  optimized: false,
+};
+
+// Map layers
+let drawMarkers = [];
+let drawPolyline = null;
+let landPolygonLayer = null;
+let exclusionLayers = [];
+let greenhouseLayers = [];
+
+// =============================================
+// MAP INIT
+// =============================================
+const map = L.map('map', {
+  center: [43.1394, -80.2634], // Brantford
+  zoom: 16,
+  zoomControl: false,
+});
+
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+// ESRI World Imagery — no API key needed
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri',
+  maxZoom: 20,
+}).addTo(map);
+
+// Mouse coordinate display
+map.on('mousemove', (e) => {
+  const el = document.getElementById('coordDisplay');
+  el.textContent = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+
+  if (state.anchor) {
+    const m = latLngToMeters(e.latlng, state.anchor);
+    el.textContent += `  |  ${m.x.toFixed(1)}, ${m.y.toFixed(1)} m`;
+  }
+});
+
+// =============================================
+// COORDINATE CONVERSION
+// =============================================
+function latLngToMeters(latlng, anchor) {
+  const dLat = latlng.lat - anchor.lat;
+  const dLng = latlng.lng - anchor.lng;
+  const avgLat = (latlng.lat + anchor.lat) / 2;
+  return {
+    x: dLng * 111320 * Math.cos(avgLat * Math.PI / 180),
+    y: -dLat * 110540, // Negative so Y increases downward (screen convention)
+  };
+}
+
+function metersToLatLng(m, anchor) {
+  const avgLat = anchor.lat; // Close enough for site scale
+  const dLng = m.x / (111320 * Math.cos(avgLat * Math.PI / 180));
+  const dLat = -m.y / 110540;
+  return { lat: anchor.lat + dLat, lng: anchor.lng + dLng };
+}
+
+// =============================================
+// SEARCH
+// =============================================
+function searchLocation() {
+  const query = document.getElementById('searchInput').value.trim();
+  if (!query) return;
+
+  // Check if it's coords
+  const coordMatch = query.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+  if (coordMatch) {
+    map.setView([parseFloat(coordMatch[1]), parseFloat(coordMatch[2])], 17);
+    return;
+  }
+
+  // Use Nominatim (free, no key)
+  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.length > 0) {
+        map.setView([parseFloat(data[0].lat), parseFloat(data[0].lon)], 17);
+      } else {
+        setStatus('Location not found.');
+      }
+    })
+    .catch(() => setStatus('Search failed — try coordinates.'));
+}
+
+document.getElementById('searchInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') searchLocation();
+});
+
+// =============================================
+// DRAWING
+// =============================================
+function startDrawLand() {
+  clearAll();
+  state.mode = 'draw-land';
+  state.drawPoints = [];
+  document.getElementById('btnDrawLand').classList.add('active');
+  document.getElementById('map').classList.add('crosshair-cursor');
+  document.getElementById('modeBadge').classList.add('active');
+  document.getElementById('modeBadge').textContent = 'DRAWING LAND — Click to place points, click first point to close';
+  setStatus('Click on the map to place vertices. Click the first point to close.');
+}
+
+function startDrawExclusion() {
+  state.mode = 'draw-exclusion';
+  state.drawPoints = [];
+  document.getElementById('btnDrawExclude').classList.add('active');
+  document.getElementById('map').classList.add('crosshair-cursor');
+  document.getElementById('modeBadge').classList.add('active');
+  document.getElementById('modeBadge').textContent = 'DRAWING EXCLUSION — Click to place points, click first point to close';
+  setStatus('Draw an exclusion zone. Click first point to close.');
+}
+
+map.on('click', (e) => {
+  if (state.mode === 'idle') return;
+
+  const latlng = e.latlng;
+
+  // Close polygon if clicking near first point
+  if (state.drawPoints.length >= 3) {
+    const first = state.drawPoints[0];
+    const dist = map.latLngToLayerPoint(latlng).distanceTo(map.latLngToLayerPoint(L.latLng(first.lat, first.lng)));
+    if (dist < 15) {
+      finishDrawing();
+      return;
+    }
+  }
+
+  state.drawPoints.push({ lat: latlng.lat, lng: latlng.lng });
+
+  // Set anchor on first land point
+  if (state.mode === 'draw-land' && state.drawPoints.length === 1) {
+    state.anchor = { lat: latlng.lat, lng: latlng.lng };
+  }
+
+  // Add marker
+  const isFirst = state.drawPoints.length === 1;
+  const marker = L.circleMarker(latlng, {
+    radius: isFirst ? 8 : 5,
+    color: state.mode === 'draw-land' ? '#e94560' : '#e67e22',
+    fillColor: state.mode === 'draw-land' ? '#e94560' : '#e67e22',
+    fillOpacity: isFirst ? 1 : 0.7,
+    weight: 2,
+  }).addTo(map);
+
+  if (isFirst) {
+    marker.bindTooltip('Close', { permanent: false, direction: 'top', offset: [0, -10] });
+  }
+
+  drawMarkers.push(marker);
+
+  // Update polyline
+  const pts = state.drawPoints.map(p => [p.lat, p.lng]);
+  if (drawPolyline) map.removeLayer(drawPolyline);
+  drawPolyline = L.polyline(pts, {
+    color: state.mode === 'draw-land' ? '#e94560' : '#e67e22',
+    weight: 2,
+    dashArray: '6 4',
+  }).addTo(map);
+
+  updateVertexList();
+  setStatus(`${state.drawPoints.length} points placed. Click first point to close polygon.`);
+});
+
+function finishDrawing() {
+  if (state.mode === 'draw-land') {
+    state.landLatLngs = [...state.drawPoints];
+    state.landMeters = state.landLatLngs.map(p => latLngToMeters(p, state.anchor));
+
+    // Draw filled polygon
+    if (landPolygonLayer) map.removeLayer(landPolygonLayer);
+    landPolygonLayer = L.polygon(
+      state.landLatLngs.map(p => [p.lat, p.lng]),
+      { color: '#e94560', weight: 2, fillColor: '#e94560', fillOpacity: 0.1 }
+    ).addTo(map);
+
+    const area = polygonArea(state.landMeters);
+    document.getElementById('metricsSection').style.display = 'block';
+    document.getElementById('metricArea').innerHTML = `${area.toFixed(0)}<span class="metric-unit"> m²</span>`;
+
+    setStatus(`Land boundary closed — ${area.toFixed(0)} m². Click "Optimize" to place greenhouses.`);
+  } else if (state.mode === 'draw-exclusion') {
+    const excLatLngs = [...state.drawPoints];
+    state.exclusions.push(excLatLngs);
+    const excLayer = L.polygon(
+      excLatLngs.map(p => [p.lat, p.lng]),
+      { color: '#e67e22', weight: 2, fillColor: '#e67e22', fillOpacity: 0.25 }
+    ).addTo(map);
+    exclusionLayers.push(excLayer);
+    setStatus('Exclusion zone added.');
+  }
+
+  // Cleanup drawing state
+  drawMarkers.forEach(m => map.removeLayer(m));
+  drawMarkers = [];
+  if (drawPolyline) { map.removeLayer(drawPolyline); drawPolyline = null; }
+  state.mode = 'idle';
+  state.drawPoints = [];
+  document.getElementById('btnDrawLand').classList.remove('active');
+  document.getElementById('btnDrawExclude').classList.remove('active');
+  document.getElementById('map').classList.remove('crosshair-cursor');
+  document.getElementById('modeBadge').classList.remove('active');
+}
+
+// ESC to cancel
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && state.mode !== 'idle') {
+    drawMarkers.forEach(m => map.removeLayer(m));
+    drawMarkers = [];
+    if (drawPolyline) { map.removeLayer(drawPolyline); drawPolyline = null; }
+    state.mode = 'idle';
+    state.drawPoints = [];
+    document.getElementById('btnDrawLand').classList.remove('active');
+    document.getElementById('btnDrawExclude').classList.remove('active');
+    document.getElementById('map').classList.remove('crosshair-cursor');
+    document.getElementById('modeBadge').classList.remove('active');
+    setStatus('Drawing cancelled.');
+  }
+});
+
+// =============================================
+// GEOMETRY HELPERS
+// =============================================
+
+// Ray-casting point-in-polygon
+function pointInPolygon(px, py, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y;
+    const xj = poly[j].x, yj = poly[j].y;
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// 9-point cell coverage test (how much of cell is inside polygon)
+function cellCoverage(cellU, cellV, bSize, hWidth, poly) {
+  let inside = 0;
+  for (let di = 0; di <= 2; di++) {
+    for (let dj = 0; dj <= 2; dj++) {
+      const px = cellU + (di / 2) * bSize;
+      const py = cellV + (dj / 2) * hWidth;
+      if (pointInPolygon(px, py, poly)) inside++;
+    }
+  }
+  return inside / 9;
+}
+
+// Trace perimeter of active grid cells → polygon path in grid coords
+function tracePerimeter(grid, numRows, numCols) {
+  // Collect directed boundary edges (CW around active cells)
+  const edges = [];
+
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numCols; col++) {
+      if (!grid[row][col]) continue;
+      // Bottom: no neighbor below
+      if (row === 0 || !grid[row - 1][col])
+        edges.push({ from: `${col},${row}`, to: `${col + 1},${row}` });
+      // Right: no neighbor right
+      if (col === numCols - 1 || !grid[row][col + 1])
+        edges.push({ from: `${col + 1},${row}`, to: `${col + 1},${row + 1}` });
+      // Top: no neighbor above
+      if (row === numRows - 1 || !grid[row + 1][col])
+        edges.push({ from: `${col + 1},${row + 1}`, to: `${col},${row + 1}` });
+      // Left: no neighbor left
+      if (col === 0 || !grid[row][col - 1])
+        edges.push({ from: `${col},${row + 1}`, to: `${col},${row}` });
+    }
+  }
+
+  if (edges.length === 0) return [];
+
+  // Build adjacency: point → next point
+  const adj = {};
+  for (const e of edges) {
+    adj[e.from] = e.to;
+  }
+
+  // Walk
+  const start = edges[0].from;
+  const path = [start];
+  let current = adj[start];
+  let safety = edges.length + 2;
+  while (current && current !== start && safety-- > 0) {
+    path.push(current);
+    current = adj[current];
+  }
+
+  return path;
+}
+
+// Convert grid coord string "col,row" to UV meters
+function gridToUV(coordStr, startU, startV, baySize, houseWidth) {
+  const [col, row] = coordStr.split(',').map(Number);
+  return { u: startU + col * baySize, v: startV + row * houseWidth };
+}
+
+// UV to world XY (rotate back)
+function uvToWorld(u, v, cosR, sinR) {
+  return { x: u * cosR - v * sinR, y: u * sinR + v * cosR };
+}
+
+// =============================================
+// OPTIMIZER — grid-based with jog support
+// =============================================
+function runOptimize() {
+  if (state.landMeters.length < 3) {
+    setStatus('Draw a land boundary first!');
+    return;
+  }
+
+  const houseWidth = parseFloat(document.getElementById('houseWidth').value);
+  const baySize = parseFloat(document.getElementById('baySize').value);
+  const maxShaft = parseFloat(document.getElementById('maxShaft').value);
+  const maxCable = parseFloat(document.getElementById('maxCable').value);
+  const angleDeg = parseFloat(document.getElementById('treeDirection').value);
+  const angle = angleDeg * Math.PI / 180;
+  const MIN_BAYS = 4;
+
+  // Rotate land polygon to UV space
+  const cosN = Math.cos(-angle), sinN = Math.sin(-angle);
+  const rotatedLand = state.landMeters.map(p => ({
+    x: p.x * cosN - p.y * sinN,
+    y: p.x * sinN + p.y * cosN,
+  }));
+
+  const ru = rotatedLand.map(p => p.x);
+  const rv = rotatedLand.map(p => p.y);
+  const rBounds = {
+    minU: Math.min(...ru), maxU: Math.max(...ru),
+    minV: Math.min(...rv), maxV: Math.max(...rv),
+  };
+
+  // Grid dimensions
+  const numCols = Math.floor((rBounds.maxU - rBounds.minU) / baySize);
+  const numRows = Math.floor((rBounds.maxV - rBounds.minV) / houseWidth);
+  const startU = rBounds.minU;
+  const startV = rBounds.minV;
+
+  if (numCols < MIN_BAYS || numRows < 1) {
+    setStatus('Parcel too small for greenhouse placement.');
+    return;
+  }
+
+  // Step 1: Build grid — mark cells with >50% coverage
+  const grid = [];
+  for (let row = 0; row < numRows; row++) {
+    grid[row] = [];
+    for (let col = 0; col < numCols; col++) {
+      const cellU = startU + col * baySize;
+      const cellV = startV + row * houseWidth;
+      const cov = cellCoverage(cellU, cellV, baySize, houseWidth, rotatedLand);
+      grid[row][col] = cov > 0.5;
+    }
+  }
+
+  // Step 2: Enforce 4-bay minimum per row
+  // For each row, find contiguous runs of active cols. Kill runs < MIN_BAYS.
+  for (let row = 0; row < numRows; row++) {
+    let runStart = -1;
+    for (let col = 0; col <= numCols; col++) {
+      const active = col < numCols && grid[row][col];
+      if (active && runStart === -1) {
+        runStart = col;
+      } else if (!active && runStart !== -1) {
+        const runLen = col - runStart;
+        if (runLen < MIN_BAYS) {
+          for (let k = runStart; k < col; k++) grid[row][k] = false;
+        }
+        runStart = -1;
+      }
+    }
+  }
+
+  // Step 3: Also enforce minimum rows per column (at least 1 house)
+  // Remove orphan columns with no active cells
+  for (let col = 0; col < numCols; col++) {
+    let hasAny = false;
+    for (let row = 0; row < numRows; row++) {
+      if (grid[row][col]) { hasAny = true; break; }
+    }
+    if (!hasAny) {
+      for (let row = 0; row < numRows; row++) grid[row][col] = false;
+    }
+  }
+
+  // Step 4: Keep only the largest connected component (flood fill)
+  const visited = Array.from({ length: numRows }, () => Array(numCols).fill(false));
+  let bestComponent = [];
+
+  function floodFill(startRow, startCol) {
+    const component = [];
+    const stack = [[startRow, startCol]];
+    while (stack.length > 0) {
+      const [r, c] = stack.pop();
+      if (r < 0 || r >= numRows || c < 0 || c >= numCols) continue;
+      if (visited[r][c] || !grid[r][c]) continue;
+      visited[r][c] = true;
+      component.push([r, c]);
+      stack.push([r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]);
+    }
+    return component;
+  }
+
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numCols; col++) {
+      if (grid[row][col] && !visited[row][col]) {
+        const comp = floodFill(row, col);
+        if (comp.length > bestComponent.length) bestComponent = comp;
+      }
+    }
+  }
+
+  // Zero out everything not in the best component
+  for (let row = 0; row < numRows; row++)
+    for (let col = 0; col < numCols; col++)
+      grid[row][col] = false;
+  for (const [r, c] of bestComponent) grid[r][c] = true;
+
+  // Count active cells
+  let activeCells = bestComponent.length;
+  if (activeCells === 0) {
+    setStatus('No valid greenhouse placement found.');
+    return;
+  }
+
+  // Step 5: Trace perimeter
+  const perimPath = tracePerimeter(grid, numRows, numCols);
+  if (perimPath.length < 3) {
+    setStatus('Could not trace greenhouse perimeter.');
+    return;
+  }
+
+  // Convert perimeter to lat/lng
+  const cosR = Math.cos(angle), sinR = Math.sin(angle);
+  const perimLatLng = perimPath.map(coordStr => {
+    const uv = gridToUV(coordStr, startU, startV, baySize, houseWidth);
+    const w = uvToWorld(uv.u, uv.v, cosR, sinR);
+    return metersToLatLng(w, state.anchor);
+  });
+
+  // ---- RENDER ----
+  greenhouseLayers.forEach(l => map.removeLayer(l));
+  greenhouseLayers = [];
+
+  // Perimeter polygon fill
+  const ghPoly = L.polygon(
+    perimLatLng.map(p => [p.lat, p.lng]),
+    { color: '#0f9b8e', weight: 2.5, fillColor: '#0f9b8e', fillOpacity: 0.2 }
+  ).addTo(map);
+  greenhouseLayers.push(ghPoly);
+
+  // Helper: draw a line from UV coords
+  function drawLineUV(u1, v1, u2, v2, opts) {
+    const w1 = uvToWorld(u1, v1, cosR, sinR);
+    const w2 = uvToWorld(u2, v2, cosR, sinR);
+    const ll1 = metersToLatLng(w1, state.anchor);
+    const ll2 = metersToLatLng(w2, state.anchor);
+    const line = L.polyline([[ll1.lat, ll1.lng], [ll2.lat, ll2.lng]], opts).addTo(map);
+    greenhouseLayers.push(line);
+  }
+
+  // Internal house peak lines (horizontal in UV, at row boundaries)
+  // Only draw where cells on BOTH sides of the boundary are active
+  for (let row = 1; row < numRows; row++) {
+    let spanStart = -1;
+    for (let col = 0; col <= numCols; col++) {
+      const bothActive = col < numCols && grid[row][col] && grid[row - 1][col];
+      if (bothActive && spanStart === -1) {
+        spanStart = col;
+      } else if (!bothActive && spanStart !== -1) {
+        const u1 = startU + spanStart * baySize;
+        const u2 = startU + col * baySize;
+        const v = startV + row * houseWidth;
+        drawLineUV(u1, v, u2, v, { color: '#9b59b6', weight: 1, dashArray: '4 4', opacity: 0.7 });
+        spanStart = -1;
+      }
+    }
+  }
+
+  // Internal bay divider lines (vertical in UV, at col boundaries)
+  // Only draw where cells on BOTH sides of the boundary are active
+  for (let col = 1; col < numCols; col++) {
+    let spanStart = -1;
+    for (let row = 0; row <= numRows; row++) {
+      const bothActive = row < numRows && grid[row][col] && grid[row][col - 1];
+      if (bothActive && spanStart === -1) {
+        spanStart = row;
+      } else if (!bothActive && spanStart !== -1) {
+        const u = startU + col * baySize;
+        const v1 = startV + spanStart * houseWidth;
+        const v2 = startV + row * houseWidth;
+        drawLineUV(u, v1, u, v2, { color: '#0f9b8e', weight: 1, dashArray: '4 4', opacity: 0.4 });
+        spanStart = -1;
+      }
+    }
+  }
+
+  // Drive gable — left edge of each row's first active cell (blue)
+  {
+    let spanStart = -1;
+    for (let row = 0; row <= numRows; row++) {
+      let firstCol = -1;
+      if (row < numRows) {
+        for (let col = 0; col < numCols; col++) {
+          if (grid[row][col]) { firstCol = col; break; }
+        }
+      }
+      // Check continuity: same first column as previous
+      const prevFirstCol = (row > 0 && spanStart !== -1) ? (() => {
+        for (let c = 0; c < numCols; c++) if (grid[row - 1][c]) return c;
+        return -1;
+      })() : -1;
+
+      if (firstCol !== -1 && (spanStart === -1 || firstCol === prevFirstCol)) {
+        if (spanStart === -1) spanStart = row;
+      } else {
+        if (spanStart !== -1) {
+          const fc = (() => { for (let c = 0; c < numCols; c++) if (grid[spanStart][c]) return c; return 0; })();
+          const u = startU + fc * baySize;
+          drawLineUV(u, startV + spanStart * houseWidth, u, startV + row * houseWidth,
+            { color: '#3498db', weight: 3, opacity: 0.9 });
+          spanStart = firstCol !== -1 ? row : -1;
+        } else if (firstCol !== -1) {
+          spanStart = row;
+        }
+      }
+    }
+  }
+
+  // Pulley gable — right edge of each row's last active cell (purple)
+  {
+    let spanStart = -1;
+    for (let row = 0; row <= numRows; row++) {
+      let lastCol = -1;
+      if (row < numRows) {
+        for (let col = numCols - 1; col >= 0; col--) {
+          if (grid[row][col]) { lastCol = col; break; }
+        }
+      }
+      const prevLastCol = (row > 0 && spanStart !== -1) ? (() => {
+        for (let c = numCols - 1; c >= 0; c--) if (grid[row - 1][c]) return c;
+        return -1;
+      })() : -1;
+
+      if (lastCol !== -1 && (spanStart === -1 || lastCol === prevLastCol)) {
+        if (spanStart === -1) spanStart = row;
+      } else {
+        if (spanStart !== -1) {
+          const lc = (() => { for (let c = numCols - 1; c >= 0; c--) if (grid[spanStart][c]) return c; return 0; })();
+          const u = startU + (lc + 1) * baySize;
+          drawLineUV(u, startV + spanStart * houseWidth, u, startV + row * houseWidth,
+            { color: '#9b59b6', weight: 3, opacity: 0.9 });
+          spanStart = lastCol !== -1 ? row : -1;
+        } else if (lastCol !== -1) {
+          spanStart = row;
+        }
+      }
+    }
+  }
+
+  // Posts at all grid corners that touch at least one active cell
+  const postSet = new Set();
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numCols; col++) {
+      if (!grid[row][col]) continue;
+      // 4 corners of this cell
+      postSet.add(`${col},${row}`);
+      postSet.add(`${col + 1},${row}`);
+      postSet.add(`${col},${row + 1}`);
+      postSet.add(`${col + 1},${row + 1}`);
+    }
+  }
+  for (const key of postSet) {
+    const uv = gridToUV(key, startU, startV, baySize, houseWidth);
+    const w = uvToWorld(uv.u, uv.v, cosR, sinR);
+    const ll = metersToLatLng(w, state.anchor);
+    const post = L.circleMarker([ll.lat, ll.lng], {
+      radius: 2, color: '#fff', fillColor: '#fff', fillOpacity: 0.8, weight: 1,
+    }).addTo(map);
+    greenhouseLayers.push(post);
+  }
+
+  // Detect jogs
+  let isRect = true;
+  for (let row = 0; row < numRows && isRect; row++) {
+    let first = -1, last = -1;
+    for (let col = 0; col < numCols; col++) {
+      if (grid[row][col]) {
+        if (first === -1) first = col;
+        last = col;
+      }
+    }
+    if (row > 0) {
+      let prevFirst = -1, prevLast = -1;
+      for (let col = 0; col < numCols; col++) {
+        if (grid[row - 1][col]) {
+          if (prevFirst === -1) prevFirst = col;
+          prevLast = col;
+        }
+      }
+      if (first !== prevFirst || last !== prevLast) isRect = false;
+    }
+  }
+
+  // Metrics
+  const ghArea = activeCells * baySize * houseWidth;
+  const landArea = polygonArea(state.landMeters);
+  const coverage = (ghArea / landArea * 100);
+
+  // Count distinct rows/cols
+  const activeRows = new Set(bestComponent.map(([r]) => r)).size;
+  const activeCols = new Set(bestComponent.map(([, c]) => c)).size;
+
+  document.getElementById('metricArea').innerHTML = `${landArea.toFixed(0)}<span class="metric-unit"> m²</span>`;
+  document.getElementById('metricCoverage').innerHTML = `${coverage.toFixed(1)}<span class="metric-unit">%</span>`;
+  document.getElementById('metricSections').innerHTML = isRect ? '1' : 'Jog';
+  document.getElementById('metricGrid').innerHTML = `${activeRows}H×${activeCols}B`;
+
+  state.optimized = true;
+  const shapeType = isRect ? 'Rectangle' : 'Jog shape';
+  setStatus(`${shapeType}: ${activeCells} cells, ${ghArea.toFixed(0)} m², ${coverage.toFixed(1)}% coverage, ${postSet.size} posts`);
+}
+
+// =============================================
+// DEMO
+// =============================================
+function loadDemo() {
+  clearAll();
+
+  // Irregular pentagon near Brantford — looks like a real farm parcel
+  const center = map.getCenter();
+  const lat = center.lat;
+  const lng = center.lng;
+
+  // L-shaped parcel to demo jog placement
+  const demoLatLngs = [
+    { lat: lat + 0.0005, lng: lng - 0.0008 },
+    { lat: lat + 0.0005, lng: lng + 0.0004 },
+    { lat: lat + 0.0002, lng: lng + 0.0004 },
+    { lat: lat + 0.0002, lng: lng + 0.0010 },
+    { lat: lat - 0.0004, lng: lng + 0.0010 },
+    { lat: lat - 0.0004, lng: lng - 0.0008 },
+  ];
+
+  state.anchor = { lat: demoLatLngs[0].lat, lng: demoLatLngs[0].lng };
+  state.landLatLngs = demoLatLngs;
+  state.landMeters = demoLatLngs.map(p => latLngToMeters(p, state.anchor));
+
+  // Draw polygon
+  landPolygonLayer = L.polygon(
+    demoLatLngs.map(p => [p.lat, p.lng]),
+    { color: '#e94560', weight: 2, fillColor: '#e94560', fillOpacity: 0.1 }
+  ).addTo(map);
+
+  map.fitBounds(landPolygonLayer.getBounds().pad(0.3));
+
+  const area = polygonArea(state.landMeters);
+  document.getElementById('metricsSection').style.display = 'block';
+  document.getElementById('metricArea').innerHTML = `${area.toFixed(0)}<span class="metric-unit"> m²</span>`;
+
+  updateVertexList();
+  setStatus(`Demo parcel loaded — ${area.toFixed(0)} m². Click "Optimize" to place greenhouses.`);
+
+  // Auto-optimize
+  setTimeout(() => runOptimize(), 300);
+}
+
+// =============================================
+// UTILS
+// =============================================
+function clearAll() {
+  state.mode = 'idle';
+  state.drawPoints = [];
+  state.landLatLngs = [];
+  state.landMeters = [];
+  state.exclusions = [];
+  state.anchor = null;
+  state.optimized = false;
+
+  drawMarkers.forEach(m => map.removeLayer(m));
+  drawMarkers = [];
+  if (drawPolyline) { map.removeLayer(drawPolyline); drawPolyline = null; }
+  if (landPolygonLayer) { map.removeLayer(landPolygonLayer); landPolygonLayer = null; }
+  exclusionLayers.forEach(l => map.removeLayer(l));
+  exclusionLayers = [];
+  greenhouseLayers.forEach(l => map.removeLayer(l));
+  greenhouseLayers = [];
+
+  document.getElementById('metricsSection').style.display = 'none';
+  document.getElementById('vertexSection').style.display = 'none';
+  document.getElementById('btnDrawLand').classList.remove('active');
+  document.getElementById('btnDrawExclude').classList.remove('active');
+  document.getElementById('map').classList.remove('crosshair-cursor');
+  document.getElementById('modeBadge').classList.remove('active');
+  setStatus('Click "Draw Land" to trace a parcel boundary on the satellite map.');
+}
+
+function polygonArea(pts) {
+  let area = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    area += (pts[j].x + pts[i].x) * (pts[j].y - pts[i].y);
+  }
+  return Math.abs(area / 2);
+}
+
+function setStatus(msg) {
+  document.getElementById('statusMsg').textContent = msg;
+}
+
+function updateVertexList() {
+  const pts = state.mode !== 'idle' ? state.drawPoints : state.landLatLngs;
+  if (pts.length === 0 || !state.anchor) {
+    document.getElementById('vertexSection').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('vertexSection').style.display = 'block';
+  const list = document.getElementById('vertexList');
+  list.innerHTML = pts.map((p, i) => {
+    const m = latLngToMeters(p, state.anchor);
+    return `<div class="vertex-item">
+      <span class="vertex-idx">${i + 1}</span>
+      <span class="vertex-coord">${m.x.toFixed(1)}, ${m.y.toFixed(1)} m</span>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
