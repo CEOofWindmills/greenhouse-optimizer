@@ -14,6 +14,7 @@ export const state = {
   isPanning: false,
   lastMouse: { x: 0, y: 0 },
   mouse: { x: 0, y: 0 }, // in meters
+  orthoMode: false,
 };
 
 // Canvas references — set once in main.js

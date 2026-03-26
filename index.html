@@ -16,6 +16,8 @@
     <button class="btn-primary" id="btn-draw-land" title="Click points to define land boundary">Draw Land</button>
     <button class="btn-secondary" id="btn-draw-exclusion" title="Draw exclusion zones (buildings, ponds, etc)">Exclusion Zone</button>
     <button class="btn-danger" id="btn-clear">Clear All</button>
+    <button class="btn-secondary" id="btn-demo" title="Load a demo land parcel">Demo</button>
+    <button class="btn-secondary" id="btn-ortho" title="Toggle ortho mode (snap to row direction)">Ortho: Off</button>
   </div>
 
   <h3>Tree Rows</h3>
@@ -85,8 +87,13 @@
       <span class="unit">m</span>
     </div>
     <div class="param-row">
-      <label>Bracing Distance</label>
-      <input type="number" id="bracing-dist" value="1.5" min="0" max="5" step="0.1">
+      <label>Gable Bracing Dist</label>
+      <input type="number" id="gable-bracing-dist" value="1.5" min="0" max="5" step="0.1">
+      <span class="unit">m</span>
+    </div>
+    <div class="param-row">
+      <label>Sidewall Bracing Dist</label>
+      <input type="number" id="sidewall-bracing-dist" value="1.5" min="0" max="5" step="0.1">
       <span class="unit">m</span>
     </div>
     <div class="param-row">

@@ -1,7 +1,45 @@
 import { state, canvas } from '../core/state.js';
-import { getScale, screenToMeters, metersToScreen } from '../core/transforms.js';
+import { getScale, getParams, screenToMeters, metersToScreen } from '../core/transforms.js';
 import { polygonArea } from '../core/geometry.js';
 import { draw } from '../render/draw.js';
+
+// Snap a point to the nearest ortho direction (along or perpendicular to tree rows)
+// relative to an anchor point
+function orthoSnap(anchor, point) {
+  const params = getParams();
+  const angle = params.treeDirection; // already in radians
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+
+  const dx = point.x - anchor.x;
+  const dy = point.y - anchor.y;
+
+  // Project delta onto row direction (U) and perpendicular (V)
+  const projU = dx * cosA + dy * sinA;
+  const projV = -dx * sinA + dy * cosA;
+
+  // Snap to whichever axis has the larger projection
+  if (Math.abs(projU) >= Math.abs(projV)) {
+    // Snap along U (row direction)
+    return {
+      x: anchor.x + projU * cosA,
+      y: anchor.y + projU * sinA,
+    };
+  } else {
+    // Snap along V (perpendicular to rows)
+    return {
+      x: anchor.x - projV * sinA,
+      y: anchor.y + projV * cosA,
+    };
+  }
+}
+
+// Get the effective mouse position (with ortho snap if active)
+function getEffectiveMouse(rawMouse) {
+  if (!state.orthoMode || state.currentPolygon.length === 0) return rawMouse;
+  const anchor = state.currentPolygon[state.currentPolygon.length - 1];
+  return orthoSnap(anchor, rawMouse);
+}
 
 export function initInputHandlers() {
   canvas.addEventListener('mousemove', onMouseMove);
@@ -17,7 +55,8 @@ function onMouseMove(e) {
   const rect = canvas.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
-  state.mouse = screenToMeters(sx, sy);
+  const rawMouse = screenToMeters(sx, sy);
+  state.mouse = getEffectiveMouse(rawMouse);
 
   document.getElementById('mouse-pos').textContent = `${state.mouse.x.toFixed(1)}, ${state.mouse.y.toFixed(1)} m`;
 
@@ -108,6 +147,18 @@ function onKeyDown(e) {
     canvas.style.cursor = 'default';
     draw();
   }
+  // F8 toggles ortho mode (like AutoCAD)
+  if (e.key === 'F8') {
+    e.preventDefault();
+    toggleOrtho();
+  }
+}
+
+export function toggleOrtho() {
+  state.orthoMode = !state.orthoMode;
+  const btn = document.getElementById('btn-ortho');
+  btn.textContent = state.orthoMode ? 'Ortho: On' : 'Ortho: Off';
+  btn.style.background = state.orthoMode ? '#0f9b8e' : '';
 }
 
 export function finishPolygon() {

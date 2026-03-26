@@ -67,8 +67,8 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
 
       const isJog = false; // jogs determined after all sections placed
 
-      const footprintWidth = sectionWidth + 2 * params.bracingDist;
-      const footprintHeight = sectionHeight + 2 * params.bracingDist;
+      const footprintWidth = sectionWidth + 2 * params.gableBracingDist;
+      const footprintHeight = sectionHeight + 2 * params.sidewallBracingDist;
 
       sections.push({
         u: gridU[currentI],

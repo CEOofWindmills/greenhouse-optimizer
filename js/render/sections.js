@@ -74,7 +74,7 @@ function drawSection(section, params, cosA, sinA, suppressDrive, suppressPulley)
 
   drawWalls(uPositions, vPositions, cosA, sinA, suppressDrive, suppressPulley);
   drawStructuralLines(uPositions, vPositions, cosA, sinA);
-  drawBracing(uPositions, vPositions, params.bracingDist, cosA, sinA, suppressDrive, suppressPulley);
+  drawBracing(uPositions, vPositions, params.gableBracingDist, params.sidewallBracingDist, cosA, sinA, suppressDrive, suppressPulley);
   drawPosts(uPositions, vPositions, cosA, sinA);
   if (!suppressDrive) drawDriveGable(uPositions, vPositions, cosA, sinA);
   if (!suppressPulley) drawPulleyGable(uPositions, vPositions, cosA, sinA);
@@ -145,8 +145,8 @@ function drawStructuralLines(uPositions, vPositions, cosA, sinA) {
 
 // Draw bracing — orange lines extending outward from perimeter posts
 // suppressDrive/suppressPulley: skip gable bracing at parallel split edges
-function drawBracing(uPositions, vPositions, bracingDist, cosA, sinA, suppressDrive, suppressPulley) {
-  if (getScale() * state.zoom <= 2 || bracingDist <= 0) return;
+function drawBracing(uPositions, vPositions, gableBracingDist, sidewallBracingDist, cosA, sinA, suppressDrive, suppressPulley) {
+  if (getScale() * state.zoom <= 2) return;
 
   const u0 = uPositions[0];
   const u1 = uPositions[uPositions.length - 1];
@@ -157,22 +157,25 @@ function drawBracing(uPositions, vPositions, bracingDist, cosA, sinA, suppressDr
   ctx.lineWidth = 1.5;
 
   // Sidewall bracing — posts along top (v0) and bottom (v1) sidewalls
-  // Braces extend outward in V direction
-  for (const u of uPositions) {
-    drawUVLine(u, v0, u, v0 - bracingDist, cosA, sinA);
-    drawUVLine(u, v1, u, v1 + bracingDist, cosA, sinA);
+  if (sidewallBracingDist > 0) {
+    for (const u of uPositions) {
+      drawUVLine(u, v0, u, v0 - sidewallBracingDist, cosA, sinA);
+      drawUVLine(u, v1, u, v1 + sidewallBracingDist, cosA, sinA);
+    }
   }
 
   // Gable bracing — posts along left (u0) and right (u1) gables
   // Skip at parallel splits (interior connection, not exposed edge)
-  if (!suppressDrive) {
-    for (const v of vPositions) {
-      drawUVLine(u0, v, u0 - bracingDist, v, cosA, sinA);
+  if (gableBracingDist > 0) {
+    if (!suppressDrive) {
+      for (const v of vPositions) {
+        drawUVLine(u0, v, u0 - gableBracingDist, v, cosA, sinA);
+      }
     }
-  }
-  if (!suppressPulley) {
-    for (const v of vPositions) {
-      drawUVLine(u1, v, u1 + bracingDist, v, cosA, sinA);
+    if (!suppressPulley) {
+      for (const v of vPositions) {
+        drawUVLine(u1, v, u1 + gableBracingDist, v, cosA, sinA);
+      }
     }
   }
 }

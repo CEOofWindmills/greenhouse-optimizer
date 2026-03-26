@@ -3,6 +3,7 @@ import { getScale } from '../core/transforms.js';
 import { polygonBounds } from '../core/geometry.js';
 import { optimize } from '../engine/optimizer.js';
 import { draw } from '../render/draw.js';
+import { toggleOrtho } from './input-handlers.js';
 
 export function initButtons() {
   document.getElementById('btn-draw-land').addEventListener('click', () => {
@@ -37,6 +38,24 @@ export function initButtons() {
   });
 
   document.getElementById('btn-optimize').addEventListener('click', optimize);
+
+  document.getElementById('btn-ortho').addEventListener('click', toggleOrtho);
+
+  document.getElementById('btn-demo').addEventListener('click', () => {
+    state.landPolygon = [
+      {x: 0, y: 0}, {x: 100, y: 0}, {x: 100, y: 80}, {x: 0, y: 80}
+    ];
+    state.exclusionZones = [];
+    state.currentPolygon = [];
+    state.optimizationResult = null;
+    state.mode = 'idle';
+    document.getElementById('mode-indicator').style.display = 'none';
+    canvas.style.cursor = 'default';
+    document.getElementById('land-area').textContent = '8000 m²';
+    optimize();
+    // Fit to view
+    document.getElementById('btn-fit').click();
+  });
 
   document.getElementById('btn-zoom-in').addEventListener('click', () => {
     state.zoom *= 1.3;

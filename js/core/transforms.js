@@ -34,7 +34,8 @@ export function getParams() {
     minBaysSplit: parseInt(document.getElementById('min-bays-split').value),
     maxDriveShaft: parseFloat(document.getElementById('max-drive-shaft').value),
     maxDriveCable: parseFloat(document.getElementById('max-drive-cable').value),
-    bracingDist: parseFloat(document.getElementById('bracing-dist').value),
+    gableBracingDist: parseFloat(document.getElementById('gable-bracing-dist').value),
+    sidewallBracingDist: parseFloat(document.getElementById('sidewall-bracing-dist').value),
     bayPostOffset: parseFloat(document.getElementById('bay-post-offset').value) || null,  // null = auto
     housePostOffset: parseFloat(document.getElementById('house-post-offset').value) || null,  // null = auto
     postPenalty: parseFloat(document.getElementById('post-penalty').value) || null,  // null = use default (0.8)
