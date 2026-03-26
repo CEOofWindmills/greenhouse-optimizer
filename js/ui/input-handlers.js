@@ -79,8 +79,8 @@ function onMouseMove(e) {
     canvas.style.cursor = hover ? 'move' : 'default';
   }
 
-  // When map is active and unlocked, Leaflet handles panning — skip canvas pan
-  if (state.isPanning && (!state.mapActive || state.mapLocked)) {
+  // When map is active, skip canvas pan (locked = frozen view, unlocked = Leaflet handles it)
+  if (state.isPanning && !state.mapActive) {
     state.panX += e.clientX - state.lastMouse.x;
     state.panY += e.clientY - state.lastMouse.y;
     state.lastMouse = { x: e.clientX, y: e.clientY };
@@ -90,8 +90,9 @@ function onMouseMove(e) {
 }
 
 function onMouseDown(e) {
-  // When map is active and unlocked, Leaflet handles panning — skip canvas pan initiation
-  if ((e.button === 1 || (e.button === 0 && e.ctrlKey)) && (!state.mapActive || state.mapLocked)) {
+  // Pan: middle-click or ctrl+left-click. Disabled when map is active (locked or not —
+  // locked map means frozen view, panning canvas would desync from satellite imagery).
+  if ((e.button === 1 || (e.button === 0 && e.ctrlKey)) && !state.mapActive) {
     state.isPanning = true;
     state.lastMouse = { x: e.clientX, y: e.clientY };
     canvas.style.cursor = 'grabbing';
@@ -175,8 +176,8 @@ function onContextMenu(e) {
 }
 
 function onWheel(e) {
-  // When map is active and unlocked, let Leaflet handle zoom
-  if (state.mapActive && !state.mapLocked) return;
+  // When map is active, disable canvas zoom (locked = frozen view, unlocked = Leaflet handles it)
+  if (state.mapActive) return;
 
   e.preventDefault();
   const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
