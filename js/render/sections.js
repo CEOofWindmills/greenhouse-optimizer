@@ -138,13 +138,16 @@ function drawGridResult(result, params, cosA, sinA) {
     return;
   }
 
-  // 2. Sidewall wall lines (white, horizontal) — at sidewallOffset from outermost peaks
+  // 2. Dashed post grid lines — show where posts sit
+  drawGridPostGridLines(activeGrid, numCols, numRows, bayPostU, peakV, swOffset, cosA, sinA);
+
+  // 3. Sidewall wall lines (white, horizontal) — at sidewallOffset from outermost peaks
   // Process each cell's boundary edges, group contiguous spans
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
   ctx.lineWidth = 2;
   drawGridWalls(activeGrid, numCols, numRows, bayPostU, peakV, swOffset, cosA, sinA);
 
-  // 3. Internal peak lines (at row boundaries where both sides active)
+  // 4. Internal peak lines (at row boundaries where both sides active)
   ctx.strokeStyle = 'rgba(155, 89, 182, 0.35)';
   ctx.lineWidth = 1;
   for (let row = 1; row < numRows; row++) {
@@ -184,6 +187,72 @@ function drawGridResult(result, params, cosA, sinA) {
 
   // 8. Area label
   drawGridLabel(result, cosA, sinA);
+}
+
+// Draw dashed grid lines through every post position (grid mode)
+function drawGridPostGridLines(activeGrid, numCols, numRows, bayPostU, peakV, swOffset, cosA, sinA) {
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+
+  // Vertical dashed lines at every bay post U position
+  for (let col = 0; col <= numCols; col++) {
+    // Find the V extent: topmost sidewall to bottommost sidewall of active cells in this column
+    let minRow = -1, maxRow = -1;
+    for (let row = 0; row < numRows; row++) {
+      const active = (col < numCols && activeGrid[col][row]) || (col > 0 && activeGrid[col - 1][row]);
+      if (active) {
+        if (minRow === -1) minRow = row;
+        maxRow = row;
+      }
+    }
+    if (minRow === -1) continue;
+    const topSW = peakV(minRow) - swOffset;
+    const bottomSW = peakV(maxRow) + swOffset;
+    drawUVLine(bayPostU(col), topSW, bayPostU(col), bottomSW, cosA, sinA);
+  }
+
+  // Horizontal dashed lines at every peak V and sidewall V position
+  for (let row = 0; row < numRows; row++) {
+    // Find U extent: leftmost to rightmost bay post of active cells in this row
+    let minCol = -1, maxCol = -1;
+    for (let col = 0; col < numCols; col++) {
+      if (activeGrid[col][row]) {
+        if (minCol === -1) minCol = col;
+        maxCol = col;
+      }
+    }
+    if (minCol === -1) continue;
+    const leftU = bayPostU(minCol);
+    const rightU = bayPostU(maxCol + 1);
+
+    // Peak line
+    drawUVLine(leftU, peakV(row), rightU, peakV(row), cosA, sinA);
+
+    // Top sidewall (only if this row has no active neighbor above)
+    const hasTopNeighbor = row > 0 && (() => {
+      for (let col = minCol; col <= maxCol; col++) {
+        if (activeGrid[col][row] && activeGrid[col][row - 1]) return true;
+      }
+      return false;
+    })();
+    if (!hasTopNeighbor) {
+      drawUVLine(leftU, peakV(row) - swOffset, rightU, peakV(row) - swOffset, cosA, sinA);
+    }
+
+    // Bottom sidewall (only if this row has no active neighbor below)
+    const hasBottomNeighbor = row < numRows - 1 && (() => {
+      for (let col = minCol; col <= maxCol; col++) {
+        if (activeGrid[col][row] && activeGrid[col][row + 1]) return true;
+      }
+      return false;
+    })();
+    if (!hasBottomNeighbor) {
+      drawUVLine(leftU, peakV(row) + swOffset, rightU, peakV(row) + swOffset, cosA, sinA);
+    }
+  }
+
+  ctx.setLineDash([]);
 }
 
 // Draw sidewall and gable wall lines for the grid
@@ -444,6 +513,7 @@ function drawSection(section, params, cosA, sinA, suppressDrive, suppressPulley,
   ctx.fillStyle = section.isJog ? 'rgba(231, 76, 60, 0.1)' : 'rgba(15, 155, 142, 0.08)';
   ctx.fill();
 
+  drawPostGridLines(uPositions, vPeaks, vSidewalls, cosA, sinA);
   drawWalls(uPositions, vPeaks, vSidewalls, cosA, sinA, suppressDrive, suppressPulley, suppressTopSW, suppressBottomSW);
   drawStructuralLines(uPositions, vPeaks, vSidewalls, cosA, sinA);
   drawBracing(uPositions, vPeaks, vSidewalls, params.gableBracingDist, params.sidewallBracingDist, cosA, sinA, suppressDrive, suppressPulley, suppressTopSW, suppressBottomSW);
@@ -522,6 +592,31 @@ function drawWalls(uPositions, vPeaks, vSidewalls, cosA, sinA, suppressDrive, su
   // Gables (along V, from sidewall to sidewall) — suppress at parallel splits
   if (!suppressDrive) drawUVLine(u0, swTop, u0, swBottom, cosA, sinA);
   if (!suppressPulley) drawUVLine(u1, swTop, u1, swBottom, cosA, sinA);
+}
+
+// Draw dashed grid lines through every post position (section mode)
+function drawPostGridLines(uPositions, vPeaks, vSidewalls, cosA, sinA) {
+  if (getScale() * state.zoom <= 2) return;
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+
+  // Vertical dashed lines at every U post position
+  for (const u of uPositions) {
+    drawUVLine(u, vSidewalls.top, u, vSidewalls.bottom, cosA, sinA);
+  }
+
+  // Horizontal dashed lines at every peak V and sidewall V positions
+  const u0 = uPositions[0];
+  const u1 = uPositions[uPositions.length - 1];
+  for (const v of vPeaks) {
+    drawUVLine(u0, v, u1, v, cosA, sinA);
+  }
+  drawUVLine(u0, vSidewalls.top, u1, vSidewalls.top, cosA, sinA);
+  drawUVLine(u0, vSidewalls.bottom, u1, vSidewalls.bottom, cosA, sinA);
+
+  ctx.setLineDash([]);
 }
 
 // Internal structural lines — peak lines and bay lines

@@ -4,6 +4,7 @@ import { drawGrid } from './grid.js';
 import { drawTreeRows } from './trees.js';
 import { drawOptimizationResult } from './sections.js';
 import { getEntities, getTypeHandler } from '../core/entities.js';
+import { resolveSnapRef } from '../core/snap.js';
 
 export function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -64,6 +65,7 @@ export function draw() {
 
   drawVertices(state.landPolygon, '#e94560', '#fff', 'land');
   drawInProgressVertices();
+  drawMeasurements();
 }
 
 function drawPolygon(poly, fill, stroke, closed) {
@@ -136,4 +138,94 @@ function drawInProgressVertices() {
     ctx.textAlign = 'center';
     ctx.fillText(idx + 1, s.x, s.y - 12);
   }
+}
+
+function drawMeasurements() {
+  // Draw saved measurements (if visible), resolving snap refs for attached dimensions
+  if (state.showMeasurements) {
+    for (const m of state.measurements) {
+      const start = resolveSnapRef(m.startRef) || m.start;
+      const end = resolveSnapRef(m.endRef) || m.end;
+      drawMeasurementLine(start, end);
+    }
+  }
+
+  // Draw in-progress measurement
+  if (state.measureStart) {
+    const resolvedStart = resolveSnapRef(state.measureStartRef) || state.measureStart;
+    const endPoint = state.snapPoint || state.mouse;
+    drawMeasurementLine(resolvedStart, endPoint, true);
+  }
+
+  // Draw snap indicator
+  if (state.snapPoint && state.mode === 'measure') {
+    const s = metersToScreen(state.snapPoint.x, state.snapPoint.y);
+    const size = 6;
+    const colors = { vertex: '#e94560', post: '#ffffff', tree: '#2ecc71', grid: '#0f9b8e' };
+    const color = colors[state.snapPoint.type] || '#ffffff';
+
+    // Diamond shape
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y - size);
+    ctx.lineTo(s.x + size, s.y);
+    ctx.lineTo(s.x, s.y + size);
+    ctx.lineTo(s.x - size, s.y);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+function drawMeasurementLine(start, end, inProgress) {
+  const s1 = metersToScreen(start.x, start.y);
+  const s2 = metersToScreen(end.x, end.y);
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(s1.x, s1.y);
+  ctx.lineTo(s2.x, s2.y);
+  ctx.strokeStyle = inProgress ? 'rgba(255, 255, 255, 0.6)' : '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash(inProgress ? [6, 4] : []);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // End ticks (perpendicular marks at start and end)
+  const dx = s2.x - s1.x, dy = s2.y - s1.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) return;
+  const nx = -dy / len * 6, ny = dx / len * 6; // perpendicular, 6px
+  ctx.beginPath();
+  ctx.moveTo(s1.x + nx, s1.y + ny);
+  ctx.lineTo(s1.x - nx, s1.y - ny);
+  ctx.moveTo(s2.x + nx, s2.y + ny);
+  ctx.lineTo(s2.x - nx, s2.y - ny);
+  ctx.strokeStyle = inProgress ? 'rgba(255, 255, 255, 0.6)' : '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Distance label at midpoint
+  const dist = Math.hypot(end.x - start.x, end.y - start.y);
+  const midX = (s1.x + s2.x) / 2;
+  const midY = (s1.y + s2.y) / 2;
+  const label = dist < 10 ? `${dist.toFixed(2)} m` : `${dist.toFixed(1)} m`;
+
+  ctx.font = '11px Segoe UI';
+  const textWidth = ctx.measureText(label).width;
+  const pad = 3;
+
+  // Background pill
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.beginPath();
+  ctx.roundRect(midX - textWidth / 2 - pad, midY - 7 - pad, textWidth + pad * 2, 14 + pad * 2, 3);
+  ctx.fill();
+
+  // Text
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, midX, midY);
 }

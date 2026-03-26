@@ -24,6 +24,13 @@ export const state = {
   // Vertex dragging (double-click to drag land/exclusion nodes)
   draggingVertex: null, // { polygon: 'land' | 'exclusion', zoneIndex?: number, index: number }
 
+  // Measurement tool
+  measurements: [],      // [{start, end, startRef?, endRef?}] — persisted dimensions
+  measureStart: null,    // {x,y} in meters — in-progress start point
+  measureStartRef: null, // snap reference for in-progress start
+  snapPoint: null,       // {x, y, type, ref} — current snap target for rendering
+  showMeasurements: true, // toggle visibility of saved measurements
+
   // Tree grid offset in rotated UV space (draggable)
   treeGridOffset: { u: 0, v: 0 },
 };

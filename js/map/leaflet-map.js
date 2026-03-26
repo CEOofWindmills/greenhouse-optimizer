@@ -179,7 +179,7 @@ export function updateCanvasPointerEvents() {
   }
 
   // Locked map or drawing modes — canvas captures events
-  if (state.mapLocked || state.mode === 'draw-land' || state.mode === 'draw-exclusion') {
+  if (state.mapLocked || state.mode === 'draw-land' || state.mode === 'draw-exclusion' || state.mode === 'measure') {
     canvas.style.pointerEvents = 'auto';
   } else {
     // Idle, unlocked — let Leaflet handle all interactions (pan/zoom)

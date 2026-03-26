@@ -13,11 +13,20 @@ export function initButtons() {
   document.getElementById('tool-pointer').addEventListener('click', () => setActiveTool('pointer'));
   document.getElementById('tool-draw-land').addEventListener('click', () => setActiveTool('draw-land'));
   document.getElementById('tool-draw-exclusion').addEventListener('click', () => setActiveTool('draw-exclusion'));
+  document.getElementById('tool-measure').addEventListener('click', () => setActiveTool('measure'));
   document.getElementById('tool-ortho').addEventListener('click', () => {
     toggleOrtho();
     // Update toolbar ortho button visual
     const btn = document.getElementById('tool-ortho');
     btn.classList.toggle('active', state.orthoMode);
+  });
+
+  // Toggle dimensions visibility
+  document.getElementById('btn-toggle-dims').addEventListener('click', () => {
+    state.showMeasurements = !state.showMeasurements;
+    const btn = document.getElementById('btn-toggle-dims');
+    btn.textContent = state.showMeasurements ? 'Hide Dims' : 'Show Dims';
+    draw();
   });
 
   // Sidebar actions
@@ -27,6 +36,10 @@ export function initButtons() {
     state.currentPolygon = [];
     state.optimizationResult = null;
     state.treeGridOffset = { u: 0, v: 0 };
+    state.measurements = [];
+    state.measureStart = null;
+    state.snapPoint = null;
+    document.getElementById('btn-toggle-dims').style.display = 'none';
     deselectAll();
     setActiveTool('pointer');
     document.getElementById('land-area').textContent = '0 m²';

@@ -5,6 +5,7 @@ const tools = {
   pointer: { name: 'Pointer', cursor: 'default', mode: 'idle' },
   'draw-land': { name: 'Draw Land', cursor: 'crosshair', mode: 'draw-land' },
   'draw-exclusion': { name: 'Exclusion Zone', cursor: 'crosshair', mode: 'draw-exclusion' },
+  measure: { name: 'Measure', cursor: 'crosshair', mode: 'measure' },
 };
 
 let activeTool = 'pointer';
@@ -29,7 +30,16 @@ export function setActiveTool(toolId) {
     state.currentPolygon = [];
     mi.textContent = 'Drawing Exclusion Zone — click to add points, double-click to finish';
     mi.style.display = 'block';
+  } else if (toolId === 'measure') {
+    state.measureStart = null;
+    state.measureStartRef = null;
+    state.snapPoint = null;
+    mi.textContent = 'Measure — click to set start, click again to set end. Right-click a dimension to delete it.';
+    mi.style.display = 'block';
   } else {
+    state.measureStart = null;
+    state.measureStartRef = null;
+    state.snapPoint = null;
     mi.style.display = 'none';
   }
 
