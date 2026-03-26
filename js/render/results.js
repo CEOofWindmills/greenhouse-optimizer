@@ -3,6 +3,12 @@ import { state } from '../core/state.js';
 
 export function displayResults(result, params) {
   const landArea = polygonArea(state.landPolygon);
+
+  if (result.gridMode) {
+    displayGridResults(result, landArea);
+    return;
+  }
+
   const html = `
     <div class="metric"><span>Land Area</span><span class="metric-value">${landArea.toFixed(0)} m²</span></div>
     <div class="metric"><span>Greenhouse Area</span><span class="metric-value">${result.totalArea.toFixed(0)} m²</span></div>
@@ -20,6 +26,78 @@ export function displayResults(result, params) {
   document.getElementById('results').innerHTML = html;
 
   displayGreenhouseCalcs(result, params);
+}
+
+function displayGridResults(result, landArea) {
+  // Count rows and max cols for summary
+  const { activeGrid, numCols, numRows, baySize, houseWidth } = result;
+  let totalRows = 0;
+  let maxBaysInRow = 0;
+  for (let row = 0; row < numRows; row++) {
+    let count = 0;
+    for (let col = 0; col < numCols; col++) {
+      if (activeGrid[col][row]) count++;
+    }
+    if (count > 0) {
+      totalRows++;
+      maxBaysInRow = Math.max(maxBaysInRow, count);
+    }
+  }
+
+  // Count posts (all grid corners touching active cells)
+  const postSet = new Set();
+  for (let col = 0; col < numCols; col++) {
+    for (let row = 0; row < numRows; row++) {
+      if (!activeGrid[col][row]) continue;
+      postSet.add(`${col},${row}`);
+      postSet.add(`${col + 1},${row}`);
+      postSet.add(`${col},${row + 1}`);
+      postSet.add(`${col + 1},${row + 1}`);
+    }
+  }
+
+  const isRect = result.jogCount === 0;
+  const shapeLabel = isRect ? 'Rectangle' : `Jog (${result.jogCount})`;
+
+  const html = `
+    <div class="metric"><span>Land Area</span><span class="metric-value">${landArea.toFixed(0)} m²</span></div>
+    <div class="metric"><span>Greenhouse Area</span><span class="metric-value">${result.totalArea.toLocaleString()} m²</span></div>
+    <div class="metric"><span>Coverage</span><span class="metric-value">${(result.coverage * 100).toFixed(1)}%</span></div>
+    <div class="metric"><span>Shape</span><span class="metric-value">${shapeLabel}</span></div>
+    <div class="metric"><span>Active Cells</span><span class="metric-value">${result.activeCells}</span></div>
+    <div class="metric"><span>Houses</span><span class="metric-value">${totalRows}</span></div>
+    <div class="metric"><span>Max Bays</span><span class="metric-value">${maxBaysInRow}</span></div>
+    <div class="metric"><span>Total Posts</span><span class="metric-value">${postSet.size}</span></div>
+    <hr style="border-color:#0f3460;margin:6px 0">
+    <div class="metric" style="color:#0f9b8e;font-weight:600"><span>Resolved Values</span><span></span></div>
+    <div class="metric"><span>House Width</span><span class="metric-value">${houseWidth} m</span></div>
+    <div class="metric"><span>Bay Size</span><span class="metric-value">${baySize} m</span></div>
+    <hr style="border-color:#0f3460;margin:6px 0">
+    <div class="metric" style="color:#0f9b8e;font-weight:600"><span>Per-Row Breakdown</span><span></span></div>
+    ${buildRowBreakdown(activeGrid, numCols, numRows, baySize, houseWidth)}
+  `;
+  document.getElementById('results').innerHTML = html;
+  document.getElementById('greenhouse-calcs').innerHTML = '';
+}
+
+function buildRowBreakdown(activeGrid, numCols, numRows, baySize, houseWidth) {
+  let html = '';
+  let rowIdx = 0;
+  for (let row = 0; row < numRows; row++) {
+    let first = -1, last = -1;
+    for (let col = 0; col < numCols; col++) {
+      if (activeGrid[col][row]) {
+        if (first === -1) first = col;
+        last = col;
+      }
+    }
+    if (first === -1) continue;
+    rowIdx++;
+    const bays = last - first + 1;
+    const area = bays * baySize * houseWidth;
+    html += `<div class="metric" style="font-size:11px"><span>Row ${rowIdx}</span><span class="metric-value">${bays}B (${area.toFixed(0)} m²)</span></div>`;
+  }
+  return html;
 }
 
 function displayGreenhouseCalcs(result, params) {

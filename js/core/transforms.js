@@ -35,6 +35,7 @@ export function getParams() {
     noPerpSplits: document.getElementById('no-perp-splits').checked,
     maxBays: document.getElementById('no-parallel-splits').checked ? 9999 : parseInt(document.getElementById('max-bays').value),
     minBaysSplit: document.getElementById('no-parallel-splits').checked ? 1 : parseInt(document.getElementById('min-bays-split').value),
+    mechanicalMinBays: parseInt(document.getElementById('min-bays-split').value),
     maxDriveShaft: document.getElementById('no-perp-splits').checked ? 99999 : parseFloat(document.getElementById('max-drive-shaft').value),
     maxDriveCable: parseFloat(document.getElementById('max-drive-cable').value),
     gableBracingDist: parseFloat(document.getElementById('gable-bracing-dist').value),

@@ -4,11 +4,6 @@ import { polygonArea, rectCoverageInLand } from '../core/geometry.js';
 // Balanced placement algorithm
 // Instead of greedy "take max first", distributes bays evenly across sections
 export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpacing, maxUCount, maxVCount, params, cosA, sinA) {
-  const sections = [];
-  const splits = [];
-  let totalArea = 0;
-  let jogCount = 0;
-
   // Build grid — bounded by adjusted bounds (inset for structural margins)
   // A cell at u spans [u, u+uSpacing], so its right edge must fit within adjusted bounds
   const gridU = [];
@@ -22,9 +17,20 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
     grid[i] = [];
     for (let j = 0; j < gridV.length; j++) {
       const coverage = rectCoverageInLand(gridU[i], gridV[j], uSpacing, vSpacing, params.treeDirection, state.landPolygon);
-      grid[i][j] = coverage > 0.5 ? 1 : 0;
+      grid[i][j] = coverage > 0.25 ? 1 : 0;
     }
   }
+
+  // No-splits mode: use simple grid-based perimeter tracing (like the reference)
+  const noSplitsMode = params.noParallelSplits && params.noPerpSplits;
+  if (noSplitsMode) {
+    return gridPlace(grid, gridU, gridV, uSpacing, vSpacing, params);
+  }
+
+  const sections = [];
+  const splits = [];
+  let totalArea = 0;
+  let jogCount = 0;
 
   const used = grid.map(row => row.map(() => false));
 
@@ -100,21 +106,18 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
     }
   }
 
-  // Filter out tiny residual sections (e.g. fragments at edges of angled grids)
-  // Keep only sections with at least 2 bays AND at least 2 houses
-  const filteredSections = sections.filter(s => s.bays >= 2 && s.houses >= 2);
-
-  // Recalculate totalArea from filtered sections
-  totalArea = 0;
-  for (const s of filteredSections) totalArea += s.effectiveArea;
+  // Filter sections below mechanical minimum (need at least 4 bays and 2 houses)
+  const mechanicalMinBays = params.mechanicalMinBays || 4;
+  const validSections = sections.filter(s => s.bays >= mechanicalMinBays && s.houses >= 2);
+  totalArea = validSections.reduce((sum, s) => sum + s.effectiveArea, 0);
 
   // Detect splits and jogs between section pairs
   const parallelSplits = [];   // runs along V (parallel to gables) — sections adjacent along U
   const perpSplits = [];       // runs along U (parallel to sidewalls) — sections adjacent along V
 
-  for (let a = 0; a < filteredSections.length; a++) {
-    for (let b = a + 1; b < filteredSections.length; b++) {
-      const sa = filteredSections[a], sb = filteredSections[b];
+  for (let a = 0; a < validSections.length; a++) {
+    for (let b = a + 1; b < validSections.length; b++) {
+      const sa = validSections[a], sb = validSections[b];
 
       // Parallel split: sections share a U edge (one ends where the other starts along U)
       // and overlap in V (same sidewall range)
@@ -124,7 +127,7 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
       const vAdjacent = Math.abs((sa.v + sa.height) - sb.v) < 0.01 ||
                          Math.abs((sb.v + sb.height) - sa.v) < 0.01;
 
-      if (uAdjacent) {
+      if (uAdjacent && !params.noParallelSplits) {
         // Check V overlap
         const vOverlap = Math.min(sa.v + sa.height, sb.v + sb.height) - Math.max(sa.v, sb.v);
         if (vOverlap > 0.01) {
@@ -138,7 +141,7 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
         }
       }
 
-      if (vAdjacent) {
+      if (vAdjacent && !params.noPerpSplits) {
         const uOverlap = Math.min(sa.u + sa.width, sb.u + sb.width) - Math.max(sa.u, sb.u);
         if (uOverlap > 0.01) {
           const splitV = Math.abs((sa.v + sa.height) - sb.v) < 0.01
@@ -156,28 +159,26 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
   // Jog detection: a jog occurs when adjacent sections are offset
   // (not fully aligned along their shared edge)
   jogCount = 0;
-  for (let a = 0; a < filteredSections.length; a++) {
-    for (let b = a + 1; b < filteredSections.length; b++) {
-      const sa = filteredSections[a], sb = filteredSections[b];
+  for (let a = 0; a < validSections.length; a++) {
+    for (let b = a + 1; b < validSections.length; b++) {
+      const sa = validSections[a], sb = validSections[b];
       const uAdj = Math.abs((sa.u + sa.width) - sb.u) < 0.01 ||
                     Math.abs((sb.u + sb.width) - sa.u) < 0.01;
       const vAdj = Math.abs((sa.v + sa.height) - sb.v) < 0.01 ||
                     Math.abs((sb.v + sb.height) - sa.v) < 0.01;
 
       if (uAdj) {
-        // Adjacent along U — jog if V extents don't match
         if (Math.abs(sa.v - sb.v) > 0.01 || Math.abs(sa.height - sb.height) > 0.01) {
           jogCount++;
-          filteredSections[a].isJog = true;
-          filteredSections[b].isJog = true;
+          validSections[a].isJog = true;
+          validSections[b].isJog = true;
         }
       }
       if (vAdj) {
-        // Adjacent along V — jog if U extents don't match
         if (Math.abs(sa.u - sb.u) > 0.01 || Math.abs(sa.width - sb.width) > 0.01) {
           jogCount++;
-          filteredSections[a].isJog = true;
-          filteredSections[b].isJog = true;
+          validSections[a].isJog = true;
+          validSections[b].isJog = true;
         }
       }
     }
@@ -188,7 +189,7 @@ export function greedyPlace(rotatedPoly, startU, startV, rBounds, uSpacing, vSpa
   const score = totalArea - jogCount * params.jogPenalty;
 
   return {
-    sections: filteredSections,
+    sections: validSections,
     parallelSplits,
     perpSplits,
     splits: parallelSplits, // backward compat
@@ -302,4 +303,174 @@ function distributeBays(totalBays, maxBays, minBays) {
   }
 
   return dist;
+}
+
+// ============================================================
+// Grid-based placement for no-splits mode
+// Simple: active cells → enforce min bays → flood fill → perimeter trace
+// ============================================================
+function gridPlace(grid, gridU, gridV, uSpacing, vSpacing, params) {
+  const numCols = gridU.length; // U direction (bays)
+  const numRows = gridV.length; // V direction (houses)
+  const minBays = params.mechanicalMinBays || 4;
+
+  // Step 1: Enforce min bays per row — kill contiguous runs shorter than minBays
+  for (let row = 0; row < numRows; row++) {
+    let runStart = -1;
+    for (let col = 0; col <= numCols; col++) {
+      const active = col < numCols && grid[col][row];
+      if (active && runStart === -1) {
+        runStart = col;
+      } else if (!active && runStart !== -1) {
+        if (col - runStart < minBays) {
+          for (let k = runStart; k < col; k++) grid[k][row] = 0;
+        }
+        runStart = -1;
+      }
+    }
+  }
+
+  // Step 2: Remove orphan rows (no active cells)
+  for (let row = 0; row < numRows; row++) {
+    let hasAny = false;
+    for (let col = 0; col < numCols; col++) {
+      if (grid[col][row]) { hasAny = true; break; }
+    }
+    if (!hasAny) {
+      for (let col = 0; col < numCols; col++) grid[col][row] = 0;
+    }
+  }
+
+  // Step 3: Flood fill → keep only the largest connected component
+  const visited = Array.from({ length: numCols }, () => Array(numRows).fill(false));
+  let bestComponent = [];
+
+  function floodFill(startCol, startRow) {
+    const component = [];
+    const stack = [[startCol, startRow]];
+    while (stack.length > 0) {
+      const [c, r] = stack.pop();
+      if (c < 0 || c >= numCols || r < 0 || r >= numRows) continue;
+      if (visited[c][r] || !grid[c][r]) continue;
+      visited[c][r] = true;
+      component.push([c, r]);
+      stack.push([c - 1, r], [c + 1, r], [c, r - 1], [c, r + 1]);
+    }
+    return component;
+  }
+
+  for (let col = 0; col < numCols; col++) {
+    for (let row = 0; row < numRows; row++) {
+      if (grid[col][row] && !visited[col][row]) {
+        const comp = floodFill(col, row);
+        if (comp.length > bestComponent.length) bestComponent = comp;
+      }
+    }
+  }
+
+  // Build clean active grid from best component
+  const activeGrid = Array.from({ length: numCols }, () => Array(numRows).fill(false));
+  for (const [c, r] of bestComponent) activeGrid[c][r] = true;
+
+  // Step 4: Trace perimeter
+  const perimPath = tracePerimeter(activeGrid, numCols, numRows);
+
+  // Convert grid vertices to UV coordinates
+  const perimUV = perimPath.map(coordStr => {
+    const [col, row] = coordStr.split(',').map(Number);
+    return { u: gridU[0] + col * uSpacing, v: gridV[0] + row * vSpacing };
+  });
+
+  // Step 5: Stats
+  const activeCells = bestComponent.length;
+  const totalArea = activeCells * uSpacing * vSpacing;
+
+  // Detect jogs (non-rectangular shape)
+  let jogCount = 0;
+  let prevFirst = -1, prevLast = -1;
+  for (let row = 0; row < numRows; row++) {
+    let first = -1, last = -1;
+    for (let col = 0; col < numCols; col++) {
+      if (activeGrid[col][row]) {
+        if (first === -1) first = col;
+        last = col;
+      }
+    }
+    if (first === -1) continue; // empty row
+    if (prevFirst !== -1 && (first !== prevFirst || last !== prevLast)) {
+      jogCount++;
+    }
+    prevFirst = first;
+    prevLast = last;
+  }
+
+  const landArea = polygonArea(state.landPolygon);
+  const coverage = landArea > 0 ? totalArea / landArea : 0;
+  const score = totalArea - jogCount * params.jogPenalty;
+
+  return {
+    gridMode: true,
+    activeGrid,
+    gridU,
+    gridV,
+    numCols,
+    numRows,
+    perimUV,
+    activeCells,
+    sections: [],         // empty — no sections in grid mode
+    parallelSplits: [],
+    perpSplits: [],
+    splits: [],
+    totalArea,
+    jogCount,
+    coverage,
+    score,
+    baySize: uSpacing,
+    houseWidth: vSpacing,
+  };
+}
+
+// Trace perimeter of active grid cells → closed polygon path as grid coordinate strings
+// Uses directed boundary edges and adjacency walking (CW winding)
+function tracePerimeter(activeGrid, numCols, numRows) {
+  const edges = [];
+
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numCols; col++) {
+      if (!activeGrid[col][row]) continue;
+
+      // Bottom edge (low V): no neighbor above (lower row index)
+      if (row === 0 || !activeGrid[col][row - 1])
+        edges.push({ from: `${col},${row}`, to: `${col + 1},${row}` });
+      // Right edge: no neighbor to the right
+      if (col === numCols - 1 || !activeGrid[col + 1][row])
+        edges.push({ from: `${col + 1},${row}`, to: `${col + 1},${row + 1}` });
+      // Top edge (high V): no neighbor below (higher row index)
+      if (row === numRows - 1 || !activeGrid[col][row + 1])
+        edges.push({ from: `${col + 1},${row + 1}`, to: `${col},${row + 1}` });
+      // Left edge: no neighbor to the left
+      if (col === 0 || !activeGrid[col - 1][row])
+        edges.push({ from: `${col},${row + 1}`, to: `${col},${row}` });
+    }
+  }
+
+  if (edges.length === 0) return [];
+
+  // Build adjacency: point → next point
+  const adj = {};
+  for (const e of edges) {
+    adj[e.from] = e.to;
+  }
+
+  // Walk the perimeter
+  const start = edges[0].from;
+  const path = [start];
+  let current = adj[start];
+  let safety = edges.length + 2;
+  while (current && current !== start && safety-- > 0) {
+    path.push(current);
+    current = adj[current];
+  }
+
+  return path;
 }

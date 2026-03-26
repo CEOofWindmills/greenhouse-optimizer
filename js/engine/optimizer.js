@@ -117,7 +117,7 @@ export function optimize() {
       );
 
       // Count total posts for this configuration
-      const totalPosts = countPosts(result.sections);
+      const totalPosts = result.gridMode ? countGridPosts(result) : countPosts(result.sections);
       result.totalPosts = totalPosts;
 
       // Score: maximize area, penalize posts and jogs
@@ -151,4 +151,20 @@ function countPosts(sections) {
     total += (s.bays + 1) * (s.houses + 1);
   }
   return total;
+}
+
+// Count posts for grid mode — all grid corners touching active cells
+function countGridPosts(result) {
+  const { activeGrid, numCols, numRows } = result;
+  const postSet = new Set();
+  for (let col = 0; col < numCols; col++) {
+    for (let row = 0; row < numRows; row++) {
+      if (!activeGrid[col][row]) continue;
+      postSet.add(`${col},${row}`);
+      postSet.add(`${col + 1},${row}`);
+      postSet.add(`${col},${row + 1}`);
+      postSet.add(`${col + 1},${row + 1}`);
+    }
+  }
+  return postSet.size;
 }
